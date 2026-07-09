@@ -8,6 +8,25 @@
 
 ---
 
+## Table of Contents
+
+- [The Big Picture: What We've Created](#the-big-picture-what-weve-created)
+- [The Architecture: A Symphony of Modern Tech](#the-architecture-a-symphony-of-modern-tech)
+- [Worker (Pod) Monitoring Experience](#worker-pod-monitoring-experience)
+  - [Data Collection](#data-collection)
+  - [ML Models](#ml-models)
+  - [Rule Engine](#rule-engine)
+  - [FastAPI Prediction Server](#fastapi-prediction-server)
+  - [Grafana Dashboard](#grafana-dashboard)
+  - [Design Principles](#design-principles)
+  - [System Logic](#system-logic)
+- [Tech Stack (Only 5 Things to Learn)](#tech-stack-only-5-things-to-learn)
+- [Suggested Build Timeline](#suggested-build-timeline)
+- [Architecture Documentation](#architecture-documentation)
+- [What to Say in Your Report About Scaling This Up](#what-to-say-in-your-report-about-scaling-this-up)
+
+---
+
 ## The Big Picture: What We've Created
 
 Imagine you're running a production Kubernetes cluster.
@@ -55,6 +74,8 @@ flowchart TD
 
 ---
 
+<a name="data-collection"></a>
+
 ![Data Collection](https://img.shields.io/badge/Section-Data%20Collection-blue)
 
 | Stage | Description | Experience |
@@ -65,6 +86,8 @@ flowchart TD
 | Prediction | Isolation Forest + Linear Regression | Trains in seconds |
 
 ---
+
+<a name="ml-models"></a>
 
 ![ML Models](https://img.shields.io/badge/Section-ML%20Models-green)
 
@@ -80,6 +103,8 @@ flowchart TD
 
 ---
 
+<a name="rule-engine"></a>
+
 ![Rule Engine](https://img.shields.io/badge/Section-Rule%20Engine-orange)
 
 **Flow:**
@@ -91,6 +116,8 @@ ML Signal → Rule Engine → Plain-English Recommendation
 
 ---
 
+<a name="fastapi-prediction-server"></a>
+
 ![FastAPI Server](https://img.shields.io/badge/Section-FastAPI%20Prediction%20Server-red)
 
 - REST endpoint: `GET /predict/{pod_name}`
@@ -99,6 +126,8 @@ ML Signal → Rule Engine → Plain-English Recommendation
 - Queryable by Grafana, Slack, or any dashboard
 
 ---
+
+<a name="grafana-dashboard"></a>
 
 ![Dashboard](https://img.shields.io/badge/Section-Grafana%20Dashboard-purple)
 
@@ -117,6 +146,8 @@ ML Signal → Rule Engine → Plain-English Recommendation
 
 ---
 
+<a name="design-principles"></a>
+
 ![Design Principles](https://img.shields.io/badge/Section-Design%20Principles-lightgrey)
 
 - No deep learning required — scikit-learn only
@@ -126,6 +157,8 @@ ML Signal → Rule Engine → Plain-English Recommendation
 - Production upgrade path clearly defined
 
 ---
+
+<a name="system-logic"></a>
 
 ![System Logic](https://img.shields.io/badge/Section-System%20Logic-black)
 
