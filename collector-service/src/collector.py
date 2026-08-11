@@ -49,7 +49,7 @@ class Collector:
             A dictionary mapping pod name to CPU usage.
         """
         query = (
-            f'sum by (pod) ('
+            f'sum by (pod, namespace) ('
             f'  rate(container_cpu_usage_seconds_total{{'
             f'    namespace="{namespace}",'
             f'    container!="",'
@@ -76,7 +76,7 @@ class Collector:
             A dictionary mapping pod name to memory usage in bytes.
         """
         query = (
-            f'sum by (pod) ('
+            f'sum by (pod, namespace) ('
             f'  container_memory_working_set_bytes{{'
             f'    namespace="{namespace}",'
             f'    container!="",'
@@ -103,7 +103,7 @@ class Collector:
             A dictionary mapping pod name to restart count.
         """
         query = (
-            f'sum by (pod) ('
+            f'sum by (pod, namespace) ('
             f'  kube_pod_container_status_restarts_total{{namespace="{namespace}"}}'
             f')'
         )

@@ -52,6 +52,60 @@ class PrometheusClient:
 
         return data
 
+    def query_range(
+        self,
+        promql: str,
+        start: str | float | int,
+        end: str | float | int,
+        step: str | int,
+        timeout: float = 10.0
+    ) -> Dict[str, Any]:
+        """Send a GET request to query Prometheus range API with a PromQL expression.
+
+        Args:
+            promql: The PromQL query string.
+            start: Start time (Unix timestamp or RFC3339 string).
+            end: End time (Unix timestamp or RFC3339 string).
+            step: Query resolution step width in duration format or float number of seconds.
+            timeout: Request timeout in seconds.
+
+        Returns:
+            The 'data' field of the Prometheus response.
+
+        Raises:
+            requests.exceptions.RequestException: If the HTTP request fails.
+            ValueError: If the API response status is not "success" or data format is invalid.
+        """
+        url = f"{self.base_url}/api/v1/query_range"
+        params = {
+            "query": promql,
+            "start": start,
+            "end": end,
+            "step": step
+        }
+
+        # Send GET request
+        response = requests.get(url, params=params, timeout=timeout)
+        
+        # Validate HTTP status code
+        response.raise_for_status()
+
+        # Parse JSON
+        result = response.json()
+
+        # Validate Prometheus response status
+        status = result.get("status")
+        if status != "success":
+            raise ValueError(f"Prometheus range query failed with status: {status}. Response: {result}")
+
+        # Extract data field
+        data = result.get("data")
+        if data is None:
+            raise ValueError(f"Prometheus response did not contain 'data' key. Response: {result}")
+
+        return data
+
+
 
 if __name__ == "__main__":
     # Test execution
