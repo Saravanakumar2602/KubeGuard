@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-stress
+  namespace: kubeguard-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-stress
+  template:
+    metadata:
+      labels:
+        app: cpu-stress
+    spec:
+      containers:
+      - name: cpu-burner
+        image: python:3.11-alpine
+        command:
+        - python
+        - -c
+        - |
+          import time, multiprocessing, os
+          def burn():
+              while True:
+                  pass
+          if __name__ == '__main__':
+              duration = int(os.environ.get("CPU_DURATION", "300"))
+              workers = int(os.environ.get("CPU_WORKERS", "2"))
+              print(f"Starting CPU stress with {workers} worker(s) for {duration}s")
+              processes = [multiprocessing.Process(target=burn) for _ in range(workers)]
+              for p in processes:
+                  p.start()
+              time.sleep(duration)
+              for p in processes:
+                  p.terminate()
+              print("CPU stress finished")
+        env:
+        - name: CPU_DURATION
+          value: "600"
+        - name: CPU_WORKERS
+          value: "2"
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "128Mi"
+          requests:
+            cpu: "200m"
+            memory: "64Mi"

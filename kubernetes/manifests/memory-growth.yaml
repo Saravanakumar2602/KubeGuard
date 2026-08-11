@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memory-growth
+  namespace: kubeguard-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memory-growth
+  template:
+    metadata:
+      labels:
+        app: memory-growth
+    spec:
+      containers:
+      - name: memory-grower
+        image: python:3.11-alpine
+        command:
+        - python
+        - -c
+        - |
+          import time, os
+          if __name__ == '__main__':
+              growth_mb = int(os.environ.get("MEM_GROWTH_AMOUNT_MB", "10"))
+              interval = int(os.environ.get("MEM_GROWTH_INTERVAL_SEC", "15"))
+              max_mb = int(os.environ.get("MEM_MAX_AMOUNT_MB", "80"))
+              
+              print(f"Starting memory growth: allocating {growth_mb}MB every {interval}s up to {max_mb}MB")
+              
+              allocations = []
+              allocated = 0
+              
+              while allocated < max_mb:
+                  allocations.append(b' ' * (growth_mb * 1024 * 1024))
+                  allocated += growth_mb
+                  print(f"Allocated {allocated}MB / {max_mb}MB")
+                  time.sleep(interval)
+                  
+              print("Maximum memory allocation reached. Holding allocation...")
+              # Hold memory allocation to let Prometheus scrape it
+              time.sleep(3600)
+        env:
+        - name: MEM_GROWTH_AMOUNT_MB
+          value: "10"
+        - name: MEM_GROWTH_INTERVAL_SEC
+          value: "15"
+        - name: MEM_MAX_AMOUNT_MB
+          value: "80"
+        resources:
+          limits:
+            cpu: "100m"
+            memory: "128Mi"
+          requests:
+            cpu: "50m"
+            memory: "64Mi"
