@@ -1,24 +1,42 @@
 # System Architecture
 
-The following diagram shows the high-level architecture of the components implemented so far:
+The following diagram shows the high-level architecture of KubeGuard AI components up to Helm Packaging (Step 13):
 
 ```mermaid
 flowchart TD
-    K8s["☸️ Kubernetes Cluster (Pods)"]
-    Prom["📊 Prometheus"]
-    Client["🐍 PrometheusClient"]
-    Col["⚙️ Collector"]
-    FS["⚙️ Feature Service"]
-    Output1["📦 Structured PodMetrics"]
-    Output2["📦 Structured PodFeatures"]
+    subgraph Kubernetes Cluster
+        K8s["☸️ Target Namespace Pods (demo/kubeguard-test)"]
+        PromOperator["⚙️ Prometheus Operator"]
+        ServiceMonitor["⚙️ ServiceMonitor Target"]
+        PromRule["🔔 PrometheusRule Alerting"]
+    end
 
-    K8s -->|Scrapes Metrics| Prom
-    Prom -->|HTTP API /api/v1/query| Client
-    Prom -->|HTTP API /api/v1/query_range| Client
-    Client -->|Raw Metrics JSON| Col
-    Client -->|Raw Time-Series JSON| FS
-    Col -->|Discovers & Matches| Output1
-    FS -->|Parses & Computes Trends| Output2
+    subgraph Monitoring Stack
+        Prometheus["📊 Prometheus Server"]
+        Alertmanager["🔔 Alertmanager"]
+        Grafana["📈 Grafana Dashboard"]
+    end
+
+    subgraph KubeGuard Release
+        ConfigMap["⚙️ ConfigMap (PROMETHEUS_URL)"]
+        Deployment["🐍 FastAPI Prediction Container"]
+        Service["⚙️ ClusterIP Service :8000"]
+        Worker["⚙️ Background Monitoring Worker"]
+        Exporter["⚙️ Prometheus Exporter (/metrics)"]
+    end
+
+    K8s -->|Scrapes Metrics| Prometheus
+    Prometheus -->|Historical range queries| Deployment
+    Deployment -->|Feature Engineering| Worker
+    Worker -->|ML Model & Rule Evaluation| Exporter
+    Exporter -->|Exposes Scrape Target| Service
+    ServiceMonitor -->|Discovers Endpoint| Service
+    Prometheus -->|Scrapes Exporter Endpoint| Service
+    PromOperator -->|Deploys and Configures| ServiceMonitor
+    PromOperator -->|Deploys and Configures| PromRule
+    PromRule -->|Evaluates Risk Alerts| Prometheus
+    Prometheus -->|Routes Alerts| Alertmanager
+    Grafana -->|Queries Metrics| Prometheus
 ```
 
 ## Architectural Decoupling
@@ -26,3 +44,8 @@ flowchart TD
 - **PrometheusClient**: Holds connection setup, status verification, and raw HTTP query execution.
 - **Collector**: Focuses purely on instant cluster states (pod discovery, current metrics, restart counts).
 - **Feature Service**: Focuses on historical trends (time-series sample collection, statistical aggregations, regression slope computation).
+- **Prediction Orchestration**: Links Feature Service pipelines, Isolation Forest classifiers, and Rule Engine logic into atomic scoring evaluations.
+- **Monitoring Worker**: Executes scanning loops in a background thread to decouple FastAPI REST response time from cluster evaluation durations.
+- **Prometheus Integration**: Exposes metrics endpoints and triggers rules configurations natively using Operator definitions.
+- **Helm Release Packaging**: Standardizes installation using a unified parameter values configuration.
+

@@ -27,9 +27,29 @@ This roadmap documents the implementation stages of KubeGuard AI.
 
 ---
 
-## Upcoming Phases
+### Phase 4: ML model integration & Risk Scorer (Steps 4, 5, & 6)
+- **Goal**: Implement unsupervised anomaly detection and operational risk evaluations.
+- **Implemented**:
+  - Unsupervised `IsolationForest` anomaly classifier inside `AnomalyDetector` class.
+  - Linear regression trend slope check for memory leaks inside `FeatureService` class.
+  - Grade risk levels (LOW, MEDIUM, HIGH) based on operational indicators inside `RuleEngine` class.
 
-- **Phase 4**: ML Model Integration (Isolation Forest for CPU anomaly detection, Linear Regression slope classification for memory leak predictions).
-- **Phase 5**: Serving & REST Endpoint (FastAPI server implementation).
-- **Phase 6**: Feature Store & Database Integration (PostgreSQL table setup for persistent caching).
-- **Phase 7**: Grafana Dashboards, Dockerization, and Helm Deployments.
+### Phase 5: Servings REST APIs & Exporters (Steps 7, 8, 9 & 10)
+- **Goal**: Expose evaluations via REST APIs, Dockerize, deploy, and support metrics scraping.
+- **Implemented**:
+  - FastAPI uvicorn REST controller inside `api.py`.
+  - Exporter registries and stale metric purge methods inside `metrics.py`.
+  - ServiceMonitor endpoints target configurations.
+  - Dockerized container configurations.
+
+### Phase 6: Continuous Background Monitoring (Step 11)
+- **Goal**: Run background evaluations without blocking API request lifecycle.
+- **Implemented**:
+  - Thread-safe background scanner `MonitoringWorker` inside `worker.py` checking namespace pods.
+
+### Phase 7: Prometheus Alerting & Helm Packaging (Steps 12 & 13)
+- **Goal**: Setup Kubernetes native alerting and package as an installable Helm chart.
+- **Implemented**:
+  - `PrometheusRule` configurations triggering critical alerts on thresholds.
+  - Reusable Helm Chart packaging namespaces, service monitors, deployment rules, and Grafana ConfigMaps.
+

@@ -71,3 +71,41 @@ Aggregates historical time-series metrics.
 - `get_cpu_history(...) -> List[PodMetricHistory]`
 - `get_memory_history(...) -> List[PodMetricHistory]`
 - `calculate_features(...) -> List[PodFeatures]`: Transforms CPU/Memory histories and restarts into statistical and slope-based trend features.
+
+### `RiskResult` (Pydantic Model)
+Represents the evaluated health status of a Kubernetes Pod.
+```python
+class RiskResult(BaseModel):
+    pod: str
+    namespace: str
+    risk_score: int
+    risk_level: str  # "LOW", "MEDIUM", "HIGH"
+    anomaly_detected: bool
+    rules_triggered: List[str]
+    recommendation: str
+```
+
+### `AnomalyDetector`
+Manages the IsolationForest model baseline training and inference.
+- `train_baseline(normal_observations: List[PodFeatures])`: Trains the model using synthetic normal baseline behaviors.
+- `predict(features: PodFeatures) -> bool`: Infers if the pod features are anomalous.
+
+### `RuleEngine`
+Computes deterministic operational scores and scaling recommendations.
+- `evaluate(features: PodFeatures, anomaly_detected: bool) -> RiskResult`: Applies checks on trend slopes, anomalies, and restart thresholds.
+
+### `PredictionOrchestrator`
+Orchestrates prediction lifecycle pipelines.
+- `predict_pod(namespace: str, pod: str) -> RiskResult`: Coordinates collecting, parsing features, predicting anomaly state, and scoring rules.
+
+### `MonitoringWorker`
+Daemon executing background scanning loops.
+- `start()`: Launches thread running scan cycles.
+- `stop()`: Shuts down background threads cleanly.
+- `_run_loop()`: Periodically calls `PredictionOrchestrator` for all active pods in target namespaces.
+
+### `metrics` Module
+Handles Prometheus registry formatting and updates.
+- `update_metrics(namespace: str, pod: str, result: RiskResult, features: PodFeatures)`: Writes scores, anomaly status, and trends to Gauges.
+- `cleanup_stale_metrics(active_pods: Set[Tuple[str, str]])`: Clears Gauges for deleted pods.
+
