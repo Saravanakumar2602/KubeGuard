@@ -48,4 +48,60 @@ sequenceDiagram
     FS-->>FS: Calculate Min, Max, Average for CPU & Memory
     FS-->>FS: Compute regression slope (CPU: units/sec, Memory: bytes/sec)
     FS-->>FS: Construct list of PodFeatures objects
+
+---
+
+## 3. Prediction & Scoring Flow
+This sequence shows how client API requests or background evaluations process data to grade risk levels.
+
+```mermaid
+sequenceDiagram
+    participant API as FastAPI /predict
+    participant Orch as PredictionOrchestrator
+    participant Coll as Collector
+    participant FS as FeatureService
+    participant AD as AnomalyDetector
+    participant RE as RuleEngine
+
+    API->>Orch: predict_pod(namespace, pod)
+    Orch->>Coll: collect(namespace)
+    Coll-->>Orch: PodMetrics
+    Orch->>FS: calculate_features(history, restarts)
+    FS-->>Orch: PodFeatures
+    Orch->>AD: predict(PodFeatures)
+    AD-->>Orch: anomaly_detected (True/False)
+    Orch->>RE: evaluate(PodFeatures, anomaly_detected)
+    RE-->>Orch: RiskResult (Score, Level, Recommendations)
+    Orch-->>API: RiskResult JSON
+```
+
+---
+
+## 4. Background Monitoring & Alerting Flow
+The continuously running worker loop fetches cluster metrics, updates exporter Gauges, and fires alerts.
+
+```mermaid
+sequenceDiagram
+    participant Worker as MonitoringWorker
+    participant Orch as PredictionOrchestrator
+    participant Registry as Prometheus Exporter
+    participant Prometheus as Prometheus Server
+    participant Alert as Alertmanager
+
+    loop Every 30 seconds
+        Worker->>Worker: Discover active pods in namespaces
+        Worker->>Orch: predict_pod(namespace, pod)
+        Orch-->>Worker: RiskResult + PodFeatures
+        Worker->>Registry: update_metrics(namespace, pod, result, features)
+        Worker->>Registry: cleanup_stale_metrics(active_pods)
+    end
+
+    Prometheus->>Registry: GET /metrics (Every 15 seconds)
+    Registry-->>Prometheus: Gauges text formatting
+
+    Prometheus->>Prometheus: Evaluates rules (kubeguard_pod_risk_score >= 60)
+    Note over Prometheus: Active alert transitions to PENDING then FIRING after 2m
+    Prometheus->>Alert: POST /api/v2/alerts (Firing Alerts)
+```
+
 ```
