@@ -76,3 +76,48 @@ def update_pod_metrics(features, anomaly, risk) -> None:
     # 6. Restart count
     if features.restart_count is not None:
         kubeguard_pod_restart_count.labels(namespace=ns, pod=pod).set(features.restart_count)
+
+
+def cleanup_stale_metrics(active_pods: list) -> None:
+    """Purge metrics for pods that are no longer active in the cluster.
+
+    Args:
+        active_pods: A list of tuples containing (pod_name, namespace) for active pods.
+    """
+    # Create set of active (namespace, pod) tuples for O(1) lookup
+    active_set = {(ns, pod) for pod, ns in active_pods}
+
+    # Extract currently registered labels keys
+    current_keys = list(kubeguard_pod_risk_score._metrics.keys())
+
+    for ns, pod in current_keys:
+        if (ns, pod) not in active_set:
+            # Stale pod -> remove metrics time-series
+            try:
+                kubeguard_pod_risk_score.remove(ns, pod)
+            except KeyError:
+                pass
+            try:
+                kubeguard_pod_anomaly.remove(ns, pod)
+            except KeyError:
+                pass
+            try:
+                kubeguard_pod_cpu_trend.remove(ns, pod)
+            except KeyError:
+                pass
+            try:
+                kubeguard_pod_memory_trend_bytes_per_second.remove(ns, pod)
+            except KeyError:
+                pass
+            try:
+                kubeguard_pod_restart_count.remove(ns, pod)
+            except KeyError:
+                pass
+
+            # Risk levels (one-hot keys)
+            for lvl in ["LOW", "MEDIUM", "HIGH"]:
+                try:
+                    kubeguard_pod_risk_level.remove(ns, pod, lvl)
+                except KeyError:
+                    pass
+

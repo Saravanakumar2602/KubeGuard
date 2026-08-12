@@ -2,7 +2,9 @@ import os
 import sys
 import time
 import logging
+import threading
 from typing import List, Dict
+
 from fastapi import FastAPI, HTTPException, Path, Response
 from pydantic import BaseModel, Field
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -207,13 +209,27 @@ app = FastAPI(
 )
 
 # Instantiate orchestrator
+from worker import MonitoringWorker
+
+# Instantiate orchestrator and background worker
 orchestrator = PredictionOrchestrator()
+worker = MonitoringWorker(orchestrator)
 
 
 @app.on_event("startup")
 def startup_event():
     # Attempt to train baseline model on startup
     orchestrator.initialize_model()
+    # Start background monitoring worker
+    worker.start()
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    # Stop background monitoring worker
+    worker.stop()
+
+
 
 
 # -------------------------------------------------------------
