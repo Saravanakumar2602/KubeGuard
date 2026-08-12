@@ -49,6 +49,13 @@ class TestKubeGuardAPI(unittest.TestCase):
             # Restore original base URL
             orchestrator.client.base_url = original_base
 
+    def test_metrics_endpoint(self):
+        """Verify GET /metrics returns 200 and contains kubeguard metrics format."""
+        response = self.client.get("/metrics")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("kubeguard_pod_risk_score", response.text)
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,7 +11,8 @@ collector_src = os.path.abspath(os.path.join(current_dir, "../../collector-servi
 if collector_src not in sys.path:
     sys.path.append(collector_src)
 
-from prometheus_client import PrometheusClient
+from kubeguard_prometheus_client import PrometheusClient
+
 from collector import Collector
 
 

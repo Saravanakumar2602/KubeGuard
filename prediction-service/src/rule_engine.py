@@ -17,7 +17,8 @@ feature_src = os.path.abspath(os.path.join(current_dir, "../../feature-service/s
 if feature_src not in sys.path:
     sys.path.append(feature_src)
 
-from prometheus_client import PrometheusClient
+from kubeguard_prometheus_client import PrometheusClient
+
 from collector import Collector
 from feature_service import FeatureService, PodFeatures, PodMetricHistory, MetricSample
 from anomaly_detector import IsolationForestDetector, AnomalyResult

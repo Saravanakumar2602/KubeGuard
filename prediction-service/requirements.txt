@@ -3,3 +3,5 @@ numpy
 fastapi
 uvicorn
 httpx
+requests
+prometheus-client
