@@ -216,3 +216,30 @@ Explicitly call out the production path — evaluators like seeing that you unde
 - Add a supervised failure classifier (XGBoost) once real failure events have been logged over time
 - Automate retraining with Airflow instead of manual reruns
 - Close the loop with a custom Kubernetes Operator that can act on recommendations automatically (behind manual approval for safety)
+
+---
+
+## Prometheus Alerting + Alertmanager Integration
+
+KubeGuard AI supports native Kubernetes alerting via Prometheus Operator CRDs. Alerting rules are packaged as a `PrometheusRule` resource in the `kubeguard` namespace.
+
+### Alerts Configurations
+
+| Alert Name | Expression | Duration | Severity | Description |
+|---|---|---|---|---|
+| **KubeGuardHighRiskPod** | `kubeguard_pod_risk_score >= 60` | `2m` | `critical` | Fires when a pod has a risk score indicating immediate action is required |
+| **KubeGuardPodAnomaly** | `kubeguard_pod_anomaly == 1` | `2m` | `critical` | Fires when Isolation Forest detects statistical resource anomalies |
+| **KubeGuardMemoryGrowth** | `kubeguard_pod_memory_trend_bytes_per_second > 1000` | `2m` | `critical` | Fires when memory leak is detected (sustained memory trend > 1000 B/s) |
+| **KubeGuardCPUTrend** | `kubeguard_pod_cpu_trend > 0.0001` | `2m` | `critical` | Fires when CPU rate exhibits a positive trend slope > 0.0001 cores/s |
+| **KubeGuardPodRestart** | `kubeguard_pod_restart_count >= 4` | `2m` | `critical` | Fires when a pod reaches critical restart counts (restarts >= 4) |
+
+### Discovery & Routing Flow
+1. **Rule Discovery**: The Prometheus Operator dynamically discovers the KubeGuard rules via label matching: `release: kube-prometheus-stack`.
+2. **Reload**: Rules are synced into Prometheus configuration files and evaluated.
+3. **Alert Routing**: Firing alerts are sent to Alertmanager. *Note: External notifications (Slack, email, Webhooks) are not configured at this stage.*
+
+### Verification Steps
+1. **Healthy State**: Deploy normal workloads (e.g. `demo-nginx`). Confirm that no alerts are pending/firing.
+2. **Controlled Firing**: Deploy a load generation pod (`cpu-stress` or `memory-growth` in `kubeguard-test` namespace). Verify that KubeGuard detects the trend, raises the metric value, and Prometheus transitions the alert to `PENDING` and then `FIRING`.
+3. **Automatic Resolution**: Delete the stress workload. KubeGuard stale metric cleanup purges the defunct series. Prometheus rules evaluate to empty and automatically resolve the alerts.
+

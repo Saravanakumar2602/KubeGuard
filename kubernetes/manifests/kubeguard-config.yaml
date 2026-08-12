@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubeguard-config
+  namespace: kubeguard
+data:
+  PROMETHEUS_URL: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
+  MONITOR_NAMESPACES: "demo,kubeguard-test"
+  MONITOR_INTERVAL_SECONDS: "30"
+

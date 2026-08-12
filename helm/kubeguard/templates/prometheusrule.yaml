@@ -1,0 +1,58 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "kubeguard.fullname" . }}-rules
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kubeguard.labels" . | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: kubeguard.rules
+    rules:
+    - alert: KubeGuardHighRiskPod
+      expr: kubeguard_pod_risk_score >= 60
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "KubeGuard detected a high-risk pod"
+        description: "Pod {{ `{{` }} $labels.exported_pod {{ `}}` }} in namespace {{ `{{` }} $labels.exported_namespace {{ `}}` }} has a KubeGuard risk score of {{ `{{` }} $value {{ `}}` }}."
+
+    - alert: KubeGuardPodAnomaly
+      expr: kubeguard_pod_anomaly == 1
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "KubeGuard detected a pod anomaly"
+        description: "Pod {{ `{{` }} $labels.exported_pod {{ `}}` }} in namespace {{ `{{` }} $labels.exported_namespace {{ `}}` }} has been flagged as anomalous by the Isolation Forest model."
+
+    - alert: KubeGuardMemoryGrowth
+      expr: kubeguard_pod_memory_trend_bytes_per_second > 1000
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "KubeGuard detected abnormal memory growth"
+        description: "Pod {{ `{{` }} $labels.exported_pod {{ `}}` }} in namespace {{ `{{` }} $labels.exported_namespace {{ `}}` }} has a memory growth trend of {{ `{{` }} $value {{ `}}` }} bytes/second, exceeding the threshold of 1000 bytes/second."
+
+    - alert: KubeGuardCPUTrend
+      expr: kubeguard_pod_cpu_trend > 0.0001
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "KubeGuard detected abnormal CPU trend"
+        description: "Pod {{ `{{` }} $labels.exported_pod {{ `}}` }} in namespace {{ `{{` }} $labels.exported_namespace {{ `}}` }} has a CPU trend of {{ `{{` }} $value {{ `}}` }} cores/second, exceeding the threshold of 0.0001 cores/second."
+
+    - alert: KubeGuardPodRestart
+      expr: kubeguard_pod_restart_count >= 4
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "KubeGuard detected critical pod restarts"
+        description: "Pod {{ `{{` }} $labels.exported_pod {{ `}}` }} in namespace {{ `{{` }} $labels.exported_namespace {{ `}}` }} has restarted {{ `{{` }} $value {{ `}}` }} times, exceeding the critical restart threshold of 4."
+{{- end }}

@@ -1,0 +1,42 @@
+# Default values for kubeguard.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+namespace: kubeguard
+createNamespace: false
+
+replicaCount: 1
+
+image:
+  repository: kubeguard-prediction-service
+  tag: "0.1.2"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+monitoring:
+  intervalSeconds: 30
+  namespaces: "demo,kubeguard-test"
+
+prometheus:
+  url: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
+
+serviceMonitor:
+  enabled: true
+  interval: 15s
+
+prometheusRule:
+  enabled: true
+
+grafanaDashboard:
+  enabled: true

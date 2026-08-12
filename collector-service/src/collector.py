@@ -1,7 +1,8 @@
 import sys
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
-from prometheus_client import PrometheusClient
+from kubeguard_prometheus_client import PrometheusClient
+
 
 
 @dataclass

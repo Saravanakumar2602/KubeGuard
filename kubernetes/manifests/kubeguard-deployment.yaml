@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeguard-prediction-service
+  namespace: kubeguard
+  labels:
+    app: kubeguard-prediction-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubeguard-prediction-service
+  template:
+    metadata:
+      labels:
+        app: kubeguard-prediction-service
+    spec:
+      containers:
+      - name: prediction-service
+        image: kubeguard-prediction-service:0.1.2
+        imagePullPolicy: IfNotPresent
+
+
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PROMETHEUS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: PROMETHEUS_URL
+        - name: MONITOR_NAMESPACES
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: MONITOR_NAMESPACES
+        - name: MONITOR_INTERVAL_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: MONITOR_INTERVAL_SECONDS
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 2
