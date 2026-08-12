@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubeguard.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "kubeguard.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kubeguard.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kubeguard.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: prediction-service
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PROMETHEUS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: PROMETHEUS_URL
+        - name: MONITOR_NAMESPACES
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: MONITOR_NAMESPACES
+        - name: MONITOR_INTERVAL_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: MONITOR_INTERVAL_SECONDS
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
