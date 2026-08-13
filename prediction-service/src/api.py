@@ -33,7 +33,8 @@ from feature_service import FeatureService, PodFeatures
 from anomaly_detector import IsolationForestDetector, AnomalyResult
 from rule_engine import RuleEngine, RiskResult
 from metrics import update_pod_metrics
-
+from feature_store import FeatureStore
+from model_store import ModelStore
 
 
 # -------------------------------------------------------------
@@ -46,6 +47,14 @@ class RiskPredictionResponse(BaseModel):
     risk_score: int = Field(..., description="Operational risk score between 0 and 100")
     reasons: List[str] = Field(default_factory=list, description="Triggered reasons for the risk score")
     recommendation: str = Field(..., description="Human-readable advisory recommendation")
+
+
+class ModelInfoResponse(BaseModel):
+    source: str = Field(..., description="Model source: bootstrap or historical")
+    version: int = Field(..., description="Model version generation number")
+    trained_at: str = Field(..., description="ISO timestamp when model was trained")
+    training_samples: int = Field(..., description="Number of samples used in training")
+    feature_count: int = Field(default=11, description="Number of features evaluated")
 
 
 # -------------------------------------------------------------
@@ -76,18 +85,98 @@ class PredictionOrchestrator:
         self.detector = IsolationForestDetector(contamination=0.1, random_state=42)
         self.rule_engine = RuleEngine()
 
-    def initialize_model(self) -> bool:
-        """Fetch baseline normal metrics and fit the Isolation Forest model on startup or on-demand.
+        # Persistent storage & model stores
+        self.feature_store = FeatureStore()
+        self.model_store = ModelStore()
 
-        Returns:
-            True if successfully trained, False otherwise.
-        """
+        # Training threshold & retraining configs
+        min_samples_str = os.environ.get("MIN_TRAINING_SAMPLES", "50")
         try:
-            logger.info("Initializing baseline model on 'demo' namespace...")
+            self.min_training_samples = int(min_samples_str)
+        except ValueError:
+            self.min_training_samples = 50
+
+        retrain_int_str = os.environ.get("MODEL_RETRAIN_INTERVAL_SECONDS", "3600")
+        try:
+            self.model_retrain_interval_seconds = float(retrain_int_str)
+        except ValueError:
+            self.model_retrain_interval_seconds = 3600.0
+
+        self.last_retrain_time = 0.0
+
+    def initialize_model(self) -> bool:
+        """Initialize Isolation Forest detector from disk artifact, real history, or bootstrap fallback."""
+        # 1. Try loading persisted model artifact from disk
+        if self.model_store.exists():
+            model_obj, meta = self.model_store.load_model()
+            if model_obj and meta:
+                self.detector.set_fitted_model(model_obj, meta)
+                logger.info(
+                    f"Loaded persisted Isolation Forest model (version={meta.get('model_version')}, "
+                    f"source={meta.get('model_source')}, samples={meta.get('training_sample_count')})"
+                )
+                return True
+
+        # 2. Check if enough real historical feature observations exist
+        sample_count = self.feature_store.count_features()
+        if sample_count >= self.min_training_samples:
+            logger.info(
+                f"Found {sample_count} historical observations (>= threshold {self.min_training_samples}). "
+                "Training historical model..."
+            )
+            return self.train_historical_model()
+
+        # 3. Fallback to bootstrap model
+        logger.info(
+            f"Historical observations ({sample_count}) < threshold ({self.min_training_samples}). "
+            "Initializing bootstrap model fallback..."
+        )
+        return self._train_bootstrap_model()
+
+    def train_historical_model(self) -> bool:
+        """Train Isolation Forest model on stored historical feature vectors."""
+        try:
+            features = self.feature_store.get_features()
+            if not features:
+                logger.warning("No historical features available to train model.")
+                return False
+
+            X = []
+            for f in features:
+                try:
+                    vec = self.detector._extract_feature_vector(f)
+                    X.append(vec)
+                except ValueError:
+                    continue
+
+            if len(X) < 1:
+                logger.warning("No valid feature vectors extracted for historical model fitting.")
+                return False
+
+            existing_meta = self.model_store.get_metadata()
+            next_version = (existing_meta.get("model_version", 0) + 1) if existing_meta else 1
+
+            self.detector.fit_vectors(X, source="historical", version=next_version)
+            self.model_store.save_model(
+                self.detector.model,
+                training_sample_count=len(X),
+                model_source="historical",
+                model_version=next_version,
+            )
+            self.last_retrain_time = time.time()
+            logger.info(f"Successfully trained & persisted historical model version {next_version} with {len(X)} samples.")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error training historical model: {e}")
+            return False
+
+    def _train_bootstrap_model(self) -> bool:
+        """Train baseline model from demo namespace with synthetic perturbation fallback."""
+        try:
             now = time.time()
             start_time = now - 15 * 60
 
-            # Verify Prometheus connectivity
             try:
                 self.client.query("up")
             except Exception as conn_err:
@@ -99,10 +188,9 @@ class PredictionOrchestrator:
             normal_features = self.feature_service.calculate_features(cpu_h, mem_h, restarts)
 
             if not normal_features:
-                logger.warning("No baseline pods found in 'demo' namespace to fit model.")
+                logger.warning("No baseline pods found in 'demo' namespace to fit bootstrap model.")
                 return False
 
-            # Bootstrap training dataset with synthetic normal observations (perturbation-based)
             import random
             training_set = []
             random.seed(42)
@@ -124,19 +212,29 @@ class PredictionOrchestrator:
                         memory_max=base_feat.memory_max * mem_noise if base_feat.memory_max is not None else 0.0,
                         memory_min=base_feat.memory_min * mem_noise if base_feat.memory_min is not None else 0.0,
                         memory_trend=base_feat.memory_trend + random.uniform(-10, 10) if base_feat.memory_trend is not None else 0.0,
-                        restart_count=base_feat.restart_count
+                        restart_count=base_feat.restart_count,
                     )
                     training_set.append(f)
 
-            self.detector.fit(training_set)
-            logger.info("Baseline IsolationForest model successfully trained.")
+            existing_meta = self.model_store.get_metadata()
+            version = existing_meta.get("model_version", 1) if existing_meta else 1
+
+            self.detector.fit(training_set, source="bootstrap", version=version)
+            self.model_store.save_model(
+                self.detector.model,
+                training_sample_count=len(training_set),
+                model_source="bootstrap",
+                model_version=version,
+            )
+            self.last_retrain_time = time.time()
+            logger.info("Bootstrap IsolationForest model successfully trained and persisted.")
             return True
 
         except PrometheusConnectionError as e:
             logger.error(f"Startup model fitting failed: {e}")
             return False
         except Exception as e:
-            logger.error(f"Unexpected error during model initialization: {e}")
+            logger.error(f"Unexpected error during bootstrap model initialization: {e}")
             return False
 
     def predict(self, namespace: str, pod: str) -> RiskResult:
@@ -176,7 +274,7 @@ class PredictionOrchestrator:
         restarts = self.collector._get_restart_count(namespace)
 
         features_list = self.feature_service.calculate_features(cpu_h, mem_h, restarts)
-        
+
         # Match current pod features
         pod_features = None
         for f in features_list:
@@ -187,16 +285,20 @@ class PredictionOrchestrator:
         if not pod_features:
             raise PodNotFoundError(f"No metric feature history found for pod '{pod}' in namespace '{namespace}'")
 
-        # 5. Run anomaly detection and rule engine
+        # 5. Persist observation to FeatureStore
+        try:
+            self.feature_store.save_feature(pod_features)
+        except Exception as store_err:
+            logger.error(f"Error persisting feature observation to FeatureStore: {store_err}")
+
+        # 6. Run anomaly detection and rule engine
         anomaly_res = self.detector.predict(pod_features)
         risk_res = self.rule_engine.evaluate(pod_features, anomaly_res)
 
-        # 6. Update Prometheus metrics
+        # 7. Update Prometheus metrics
         update_pod_metrics(pod_features, anomaly_res, risk_res)
 
-
         return risk_res
-
 
 
 # -------------------------------------------------------------
@@ -208,10 +310,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Instantiate orchestrator
+# Instantiate orchestrator and background worker
 from worker import MonitoringWorker
 
-# Instantiate orchestrator and background worker
 orchestrator = PredictionOrchestrator()
 worker = MonitoringWorker(orchestrator)
 
@@ -230,15 +331,43 @@ def shutdown_event():
     worker.stop()
 
 
-
-
 # -------------------------------------------------------------
 # HTTP Endpoints
 # -------------------------------------------------------------
 @app.get("/health")
 def health():
     """Verify that the FastAPI service is healthy."""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "model_source": orchestrator.detector.model_source,
+        "model_version": orchestrator.detector.model_version,
+    }
+
+
+@app.get(
+    "/model",
+    response_model=ModelInfoResponse,
+    summary="Get active Isolation Forest model metadata."
+)
+def model_info():
+    """Retrieve metadata about the currently active Isolation Forest model."""
+    meta = orchestrator.model_store.get_metadata()
+    if meta:
+        return ModelInfoResponse(
+            source=meta.get("model_source", orchestrator.detector.model_source),
+            version=meta.get("model_version", orchestrator.detector.model_version),
+            trained_at=meta.get("trained_at", orchestrator.detector.trained_at or "unknown"),
+            training_samples=meta.get("training_sample_count", orchestrator.detector.training_sample_count),
+            feature_count=len(meta.get("feature_names", [])) or 11,
+        )
+    return ModelInfoResponse(
+        source=orchestrator.detector.model_source,
+        version=orchestrator.detector.model_version,
+        trained_at=orchestrator.detector.trained_at or "unknown",
+        training_samples=orchestrator.detector.training_sample_count,
+        feature_count=11,
+    )
+
 
 
 @app.get(

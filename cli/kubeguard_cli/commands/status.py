@@ -73,10 +73,12 @@ def status(
     monitored_ns = cm_data.get("MONITOR_NAMESPACES", "—")
 
     # ------------------------------------------------------------------
-    # 3. Check /health via port-forward
+    # 3. Check /health & /model via port-forward
     # ------------------------------------------------------------------
     prometheus_status = "Unknown"
     worker_status = "Unknown"
+    model_source = "Unknown"
+    model_version = "Unknown"
 
     if svc and pod_phase == "Running":
         try:
@@ -93,9 +95,17 @@ def status(
                     if r.ok and r.json().get("status") == "healthy":
                         worker_status = "Running"
                         prometheus_status = "Connected"
+                        model_source = r.json().get("model_source", "Unknown")
+                        model_version = str(r.json().get("model_version", "Unknown"))
                     else:
                         worker_status = "Unhealthy"
                         prometheus_status = "Unknown"
+
+                    m_resp = _req.get(f"{base_url}/model", timeout=5)
+                    if m_resp.ok:
+                        m_data = m_resp.json()
+                        model_source = m_data.get("source", model_source)
+                        model_version = str(m_data.get("version", model_version))
                 except Exception:
                     worker_status = "Unreachable"
                     prometheus_status = "Unknown"
@@ -120,12 +130,15 @@ def status(
         "monitoring": worker_status,
         "prometheus": prometheus_status,
         "alertmanager": alertmanager_status,
+        "model_source": model_source,
+        "model_version": model_version,
         "service": svc_status,
         "config": {
             "interval": interval,
             "namespaces": monitored_ns,
         },
     }
+
 
     if as_json:
         print_json(data)
@@ -150,8 +163,11 @@ def status(
         ("Monitoring",     _style(worker_status, "running")),
         ("Prometheus",     _style(prometheus_status, "connected")),
         ("Alertmanager",   _style(alertmanager_status, "available")),
+        ("Model Source",   f"[bold cyan]{model_source}[/bold cyan]"),
+        ("Model Version",  f"v{model_version}"),
         ("Service",        svc_status),
     ]
+
 
     max_key = max(len(r[0]) for r in rows)
     for key, val in rows:

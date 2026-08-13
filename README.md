@@ -204,8 +204,23 @@ Everything else from the full enterprise version (Kafka, Spark/Flink, Elasticsea
 | 6 | PrometheusRule alerts configuration & Alertmanager routing | **Completed** |
 | 7 | Reusable Helm Chart packaging & dynamic parameter overrides | **Completed** |
 | 8 | Command-Line Interface (`kubeguard`) management layer | **Completed** |
+| 9 | Historical Feature Store (SQLite) & Model Lifecycle (`joblib`) | **Completed** |
 
 ---
+
+## ML Model Lifecycle & Telemetry Store
+
+KubeGuard learns from historical workload telemetry over time to provide operational risk assessments and detect anomalous workload behavior.
+
+- **Bootstrap Model**: On fresh deployments, KubeGuard initializes an Isolation Forest baseline using synthetic perturbation fallback so anomaly scoring works immediately.
+- **Historical Feature Store**: Routine monitoring scans accumulate real pod feature observations in an embedded SQLite repository (`/data/kubeguard.db`).
+- **Historical Model Training**: When stored observations cross `MIN_TRAINING_SAMPLES` (default: 50), KubeGuard automatically trains a **Historical Model** on real cluster behavior.
+- **Model Artifact Persistence**: Fitted models are serialized using `joblib` (`/data/kubeguard-isolation-forest.joblib`) with versioned metadata (`model_version`, `trained_at`, `training_sample_count`). Data persists across pod restarts via a 1Gi Kubernetes `PersistentVolumeClaim`.
+
+For architectural details, see [docs/MODEL_LIFECYCLE.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/MODEL_LIFECYCLE.md).
+
+---
+
 
 ## KubeGuard CLI
 

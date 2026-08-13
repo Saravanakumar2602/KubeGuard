@@ -38,6 +38,36 @@ spec:
             configMapKeyRef:
               name: {{ include "kubeguard.fullname" . }}-config
               key: MONITOR_INTERVAL_SECONDS
+        - name: FEATURE_STORE_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: FEATURE_STORE_PATH
+        - name: FEATURE_RETENTION_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: FEATURE_RETENTION_DAYS
+        - name: MODEL_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: MODEL_PATH
+        - name: MIN_TRAINING_SAMPLES
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: MIN_TRAINING_SAMPLES
+        - name: MODEL_RETRAIN_INTERVAL_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: MODEL_RETRAIN_INTERVAL_SECONDS
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         livenessProbe:
@@ -52,3 +82,10 @@ spec:
             port: 8000
           initialDelaySeconds: 10
           periodSeconds: 5
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: {{ include "kubeguard.fullname" . }}-pvc
+      {{- end }}
+
