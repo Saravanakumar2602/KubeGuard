@@ -7,4 +7,9 @@ data:
   PROMETHEUS_URL: "http://kube-prometheus-stack-prometheus.monitoring.svc:9090"
   MONITOR_NAMESPACES: "demo,kubeguard-test"
   MONITOR_INTERVAL_SECONDS: "30"
+  FEATURE_STORE_PATH: "/data/kubeguard.db"
+  FEATURE_RETENTION_DAYS: "7"
+  MODEL_PATH: "/data/kubeguard-isolation-forest.joblib"
+  MIN_TRAINING_SAMPLES: "50"
+  MODEL_RETRAIN_INTERVAL_SECONDS: "3600"
 

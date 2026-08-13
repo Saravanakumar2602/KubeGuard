@@ -51,6 +51,10 @@ class IsolationForestDetector:
             random_state=self.random_state
         )
         self.is_fitted = False
+        self.model_source = "none"
+        self.model_version = 0
+        self.trained_at: str | None = None
+        self.training_sample_count = 0
 
     def _extract_feature_vector(self, f: PodFeatures) -> List[float]:
         """Extract a clean numerical feature vector from PodFeatures.
@@ -81,11 +85,13 @@ class IsolationForestDetector:
                 )
         return features
 
-    def fit(self, training_features: List[PodFeatures]) -> None:
+    def fit(self, training_features: List[PodFeatures], source: str = "bootstrap", version: int = 1) -> None:
         """Train the Isolation Forest model on a set of normal observations.
 
         Args:
             training_features: A list of normal PodFeatures observations.
+            source: Label describing the model source ('bootstrap' or 'historical').
+            version: Generation version of the model artifact.
         """
         if not training_features:
             raise ValueError("Training features list cannot be empty.")
@@ -96,6 +102,38 @@ class IsolationForestDetector:
 
         self.model.fit(X)
         self.is_fitted = True
+        self.model_source = source
+        self.model_version = version
+        self.training_sample_count = len(X)
+        self.trained_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    def fit_vectors(self, X: List[List[float]], source: str = "historical", version: int = 1) -> None:
+        """Train the model directly on a 2D matrix of numerical feature vectors.
+
+        Args:
+            X: 2D list/array of feature vectors.
+            source: Label describing the model source.
+            version: Generation version of the model artifact.
+        """
+        if not X:
+            raise ValueError("Training vector matrix cannot be empty.")
+
+        self.model.fit(X)
+        self.is_fitted = True
+        self.model_source = source
+        self.model_version = version
+        self.training_sample_count = len(X)
+        self.trained_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    def set_fitted_model(self, model: IsolationForest, metadata: dict) -> None:
+        """Attach a pre-loaded, persisted IsolationForest model artifact and metadata."""
+        self.model = model
+        self.is_fitted = True
+        self.model_source = metadata.get("model_source", "historical")
+        self.model_version = metadata.get("model_version", 1)
+        self.training_sample_count = metadata.get("training_sample_count", 0)
+        self.trained_at = metadata.get("trained_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+
 
     def predict(self, observation: PodFeatures) -> AnomalyResult:
         """Predict if a single pod observation is anomalous.

@@ -40,7 +40,34 @@ spec:
             configMapKeyRef:
               name: kubeguard-config
               key: MONITOR_INTERVAL_SECONDS
-
+        - name: FEATURE_STORE_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: FEATURE_STORE_PATH
+        - name: FEATURE_RETENTION_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: FEATURE_RETENTION_DAYS
+        - name: MODEL_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: MODEL_PATH
+        - name: MIN_TRAINING_SAMPLES
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: MIN_TRAINING_SAMPLES
+        - name: MODEL_RETRAIN_INTERVAL_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: MODEL_RETRAIN_INTERVAL_SECONDS
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
         resources:
           requests:
             cpu: 100m
@@ -62,3 +89,8 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 5
           timeoutSeconds: 2
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: kubeguard-pvc
+

@@ -21,7 +21,17 @@ class TestKubeGuardAPI(unittest.TestCase):
         """Verify GET /health returns 200 and correct status."""
         response = self.client.get("/health")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "healthy"})
+        self.assertEqual(response.json()["status"], "healthy")
+
+    def test_model_endpoint(self):
+        """Verify GET /model returns 200 and model metadata."""
+        response = self.client.get("/model")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("source", data)
+        self.assertIn("version", data)
+        self.assertIn("feature_count", data)
+
 
     def test_predict_unknown_pod_returns_404(self):
         """Verify GET /predict/demo/nonexistent-pod returns 404."""

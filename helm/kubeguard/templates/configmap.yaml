@@ -9,3 +9,9 @@ data:
   PROMETHEUS_URL: {{ .Values.prometheus.url | quote }}
   MONITOR_NAMESPACES: {{ .Values.monitoring.namespaces | quote }}
   MONITOR_INTERVAL_SECONDS: {{ .Values.monitoring.intervalSeconds | quote }}
+  FEATURE_STORE_PATH: {{ .Values.persistence.featureStorePath | quote }}
+  FEATURE_RETENTION_DAYS: {{ .Values.persistence.retentionDays | quote }}
+  MODEL_PATH: {{ .Values.persistence.modelPath | quote }}
+  MIN_TRAINING_SAMPLES: {{ .Values.model.minTrainingSamples | quote }}
+  MODEL_RETRAIN_INTERVAL_SECONDS: {{ .Values.model.retrainIntervalSeconds | quote }}
+
