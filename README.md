@@ -46,25 +46,37 @@ Kubernetes Health AI is your intelligent cluster guardian — an ML-powered obse
 
 ```mermaid
 flowchart TD
+    subgraph Kubernetes Cluster
+        K8s["☸️ Pods (demo/kubeguard-test)"]
+        ServiceMonitor["⚙️ ServiceMonitor Target"]
+        PromRule["🔔 PrometheusRule Alerting"]
+    end
 
-    A["☸️ Kubernetes Cluster (Minikube/Kind)"]
-    B["📊 Prometheus (Metrics Scraper)"]
-    C["🐍 Python CronJob (Feature Extractor)"]
-    D["🗄️ Feature Store (PostgreSQL / CSV)"]
-    E["🤖 ML Models (scikit-learn)"]
-    F["🔧 FastAPI (Prediction Server)"]
-    G["📈 Grafana Dashboard"]
+    subgraph Monitoring Stack
+        Prometheus["📊 Prometheus Server"]
+        Alertmanager["🔔 Alertmanager"]
+        Grafana["📈 Grafana Dashboard"]
+    end
 
-    A -->|CPU, Memory, Restarts| B
-    B -->|Pull every 15s| C
-    C -->|Avg CPU, Memory Slope, Restart Count| D
-    D -->|Features| E
-    E -->|Risk Score + Recommendation| F
-    F -->|REST API| G
+    subgraph KubeGuard Release (Helm)
+        Worker["⚙️ Background Monitor Worker"]
+        Exporter["⚙️ Exporter (/metrics)"]
+        PredictAPI["🐍 FastAPI Prediction Service"]
+    end
+
+    K8s -->|CPU/Memory/Restarts| Prometheus
+    Prometheus -->|Scrapes Exporter Target| Exporter
+    Prometheus -->|Historical Range Queries| PredictAPI
+    PredictAPI -->|Features pipeline| Worker
+    Worker -->|Scoring & Anomaly Check| Exporter
+    ServiceMonitor -->|Discovers scrape target| Exporter
+    PromRule -->|Risk Alerts (Risk >= 60)| Prometheus
+    Prometheus -->|Routes alerts| Alertmanager
+    Grafana -->|Queries Metrics| Prometheus
 ```
 
-> A system designed not just to observe your cluster,
-> but to predict and prevent failures before they occur.
+> An AI-powered cluster guardian, packaged as a reusable Helm chart,
+> predicting resource degradation and raising alerts automatically.
 
 ---
 
@@ -180,17 +192,84 @@ Everything else from the full enterprise version (Kafka, Spark/Flink, Elasticsea
 
 ---
 
-## Suggested Build Timeline
+## Suggested Build Timeline (All Phases Completed)
 
-| Week | Task |
-|---|---|
-| 1 | Set up a local cluster (Minikube/Kind), install Prometheus + Grafana via Helm, confirm you can see live metrics |
-| 2 | Write the Python feature-extraction script, run it manually first, then wrap it as a CronJob |
-| 3 | Train Isolation Forest on the collected features; get it flagging obvious spikes (you can simulate load with a stress-test pod) |
-| 4 | Add the trend-detection memory leak check |
-| 5 | Wrap both models in a FastAPI endpoint |
-| 6 | Wire FastAPI into a Grafana panel (or Streamlit app); add Slack alert as a stretch goal |
-| 7 | Polish, write up the report, add the "how this scales in production" section referencing Kafka/Spark/Airflow as future work |
+| Phase | Task | Status |
+|---|---|---|
+| 1 | Prometheus Connectivity & Collector setup | **Completed** |
+| 2 | Feature engineering & linear regression trends | **Completed** |
+| 3 | Isolation Forest ML anomaly validation | **Completed** |
+| 4 | FastAPI Prediction Server and Pydantic models | **Completed** |
+| 5 | Continuous background Monitoring worker and Exporter Gauges | **Completed** |
+| 6 | PrometheusRule alerts configuration & Alertmanager routing | **Completed** |
+| 7 | Reusable Helm Chart packaging & dynamic parameter overrides | **Completed** |
+| 8 | Command-Line Interface (`kubeguard`) management layer | **Completed** |
+
+---
+
+## KubeGuard CLI
+
+KubeGuard includes a command-line interface (`kubeguard`) for installation, status inspection, pod risk monitoring, and alert tracking.
+
+### CLI Installation
+
+```bash
+cd cli
+pip install .
+```
+
+### Preferred User Journey
+
+```bash
+# 1. Verify CLI installation
+kubeguard version
+
+# 2. Pre-flight check & Install KubeGuard via Helm
+kubeguard install --interval 60 --namespaces demo,kubeguard-test
+
+# 3. Check real-time cluster installation status
+kubeguard status
+
+# 4. View monitored pod risk scores
+kubeguard pods
+kubeguard pods --risk high
+
+# 5. View active alerts from Alertmanager
+kubeguard alerts
+
+# 6. Uninstall KubeGuard release
+kubeguard uninstall
+```
+
+For full CLI options and documentation, see [cli/README.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/cli/README.md).
+
+---
+
+## Helm Chart Installation
+
+KubeGuard is packaged as an installable Helm chart located at [helm/kubeguard](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/).
+
+### Quickstart
+Deploy KubeGuard into the `kubeguard` namespace:
+
+```bash
+helm install kubeguard helm/kubeguard \
+  --namespace kubeguard \
+  --create-namespace
+```
+
+### Configuration Overrides Example
+```bash
+helm install kubeguard helm/kubeguard \
+  --namespace kubeguard \
+  --create-namespace \
+  --set monitoring.intervalSeconds=60 \
+  --set monitoring.namespaces="demo"
+```
+
+---
+
+
 
 ---
 
