@@ -548,10 +548,75 @@
           "instant": false,
           "range": true,
           "refId": "A"
-        }
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 20,
+      "title": "KubeGuard System Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 21 },
+      "id": 21,
+      "title": "Worker Health",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "kubeguard_worker_healthy", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 21 },
+      "id": 22,
+      "title": "Last Successful Cycle (Ago)",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "time() - kubeguard_worker_last_success_timestamp", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 21 },
+      "id": 23,
+      "title": "Feature Store Records",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "kubeguard_feature_store_records", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 21 },
+      "id": 24,
+      "title": "Active Model Info",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "kubeguard_model_info", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 26 },
+      "id": 25,
+      "title": "Monitoring Cycle & Failure Rate",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_monitoring_cycles_total[5m])", "legendFormat": "Cycle Rate", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_monitoring_cycle_failures_total[5m])", "legendFormat": "Failure Rate", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 26 },
+      "id": 26,
+      "title": "Cycle Duration & Prediction Failures",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_monitoring_cycle_duration_seconds_sum[5m]) / rate(kubeguard_monitoring_cycle_duration_seconds_count[5m])", "legendFormat": "Avg Duration (s)", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_pod_predictions_total{result=\"failure\"}[5m])", "legendFormat": "Prediction Failures", "refId": "B" }
       ]
     }
   ],
+
   "schemaVersion": 38,
   "style": "dark",
   "tags": [

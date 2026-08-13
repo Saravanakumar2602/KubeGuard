@@ -12,4 +12,8 @@ data:
   MODEL_PATH: "/data/kubeguard-isolation-forest.joblib"
   MIN_TRAINING_SAMPLES: "50"
   MODEL_RETRAIN_INTERVAL_SECONDS: "3600"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "text"
+  WORKER_HEALTH_TIMEOUT_SECONDS: "90"
+
 

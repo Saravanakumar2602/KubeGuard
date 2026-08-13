@@ -19,9 +19,14 @@ if feature_src not in sys.path:
     sys.path.append(feature_src)
 
 from feature_service import PodFeatures
-
-
 from contextlib import contextmanager
+
+from metrics import (
+    kubeguard_feature_store_observations_total,
+    kubeguard_feature_store_errors_total,
+    kubeguard_feature_store_records,
+)
+
 
 class FeatureStore:
     """Repository for persistent storage of pod feature observations using SQLite."""
@@ -97,6 +102,10 @@ class FeatureStore:
                     "CREATE INDEX IF NOT EXISTS idx_ts ON feature_observations (timestamp)"
                 )
                 conn.commit()
+        try:
+            kubeguard_feature_store_records.set(self.count_features())
+        except Exception:
+            pass
         logger.info(f"FeatureStore initialized at: {self.db_path}")
 
 
@@ -117,51 +126,60 @@ class FeatureStore:
 
         ts = timestamp if timestamp is not None else time.time()
 
-        with self._lock:
-            with self._connect() as conn:
-                cursor = conn.cursor()
+        try:
+            with self._lock:
+                with self._connect() as conn:
+                    cursor = conn.cursor()
 
-                # Deduplication: check if observation for same (ns, pod) exists within 5 seconds
-                cursor.execute(
-                    """
-                    SELECT id FROM feature_observations
-                    WHERE namespace = ? AND pod = ? AND ABS(timestamp - ?) < 5.0
-                    LIMIT 1
-                    """,
-                    (f.namespace, f.pod, ts),
-                )
-                if cursor.fetchone() is not None:
-                    logger.debug(f"Skipping duplicate observation for pod '{f.pod}' in window.")
-                    return False
+                    # Deduplication: check if observation for same (ns, pod) exists within 5 seconds
+                    cursor.execute(
+                        """
+                        SELECT id FROM feature_observations
+                        WHERE namespace = ? AND pod = ? AND ABS(timestamp - ?) < 5.0
+                        LIMIT 1
+                        """,
+                        (f.namespace, f.pod, ts),
+                    )
+                    if cursor.fetchone() is not None:
+                        logger.debug(f"Skipping duplicate observation for pod '{f.pod}' in window.")
+                        return False
 
-                cursor.execute(
-                    """
-                    INSERT INTO feature_observations (
-                        timestamp, namespace, pod,
-                        cpu_current, cpu_average, cpu_max, cpu_min, cpu_trend,
-                        memory_current, memory_average, memory_max, memory_min, memory_trend,
-                        restart_count
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        ts,
-                        f.namespace,
-                        f.pod,
-                        f.cpu_current,
-                        f.cpu_average,
-                        f.cpu_max,
-                        f.cpu_min,
-                        f.cpu_trend,
-                        f.memory_current,
-                        f.memory_average,
-                        f.memory_max,
-                        f.memory_min,
-                        f.memory_trend,
-                        f.restart_count,
-                    ),
-                )
-                conn.commit()
-        return True
+                    cursor.execute(
+                        """
+                        INSERT INTO feature_observations (
+                            timestamp, namespace, pod,
+                            cpu_current, cpu_average, cpu_max, cpu_min, cpu_trend,
+                            memory_current, memory_average, memory_max, memory_min, memory_trend,
+                            restart_count
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            ts,
+                            f.namespace,
+                            f.pod,
+                            f.cpu_current,
+                            f.cpu_average,
+                            f.cpu_max,
+                            f.cpu_min,
+                            f.cpu_trend,
+                            f.memory_current,
+                            f.memory_average,
+                            f.memory_max,
+                            f.memory_min,
+                            f.memory_trend,
+                            f.restart_count,
+                        ),
+                    )
+                    conn.commit()
+
+            kubeguard_feature_store_observations_total.inc()
+            kubeguard_feature_store_records.set(self.count_features())
+            return True
+        except Exception as e:
+            kubeguard_feature_store_errors_total.inc()
+            logger.error(f"Error persisting feature observation to SQLite: {e}")
+            return False
+
 
     def count_features(self) -> int:
         """Return total count of feature observations in the database."""
@@ -255,4 +273,10 @@ class FeatureStore:
 
         if deleted > 0:
             logger.info(f"Purged {deleted} historical feature observations older than {retention_days} days.")
+
+        try:
+            kubeguard_feature_store_records.set(self.count_features())
+        except Exception:
+            pass
         return deleted
+

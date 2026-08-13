@@ -9,9 +9,8 @@ from fastapi import FastAPI, HTTPException, Path, Response
 from pydantic import BaseModel, Field
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("kubeguard-api")
+from config import KubeGuardConfig
+from logging_config import setup_logging
 
 # Resolve paths to import from collector-service, feature-service, and prediction-service
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -26,15 +25,24 @@ feature_src = os.path.abspath(os.path.join(current_dir, "../../feature-service/s
 if feature_src not in sys.path:
     sys.path.append(feature_src)
 
-
 from kubeguard_prometheus_client import PrometheusClient
 from collector import Collector
 from feature_service import FeatureService, PodFeatures
 from anomaly_detector import IsolationForestDetector, AnomalyResult
 from rule_engine import RuleEngine, RiskResult
-from metrics import update_pod_metrics
+from metrics import (
+    update_pod_metrics,
+    kubeguard_pod_predictions_total,
+    kubeguard_prediction_duration_seconds,
+)
 from feature_store import FeatureStore
 from model_store import ModelStore
+
+# Global config & logging setup
+config = KubeGuardConfig.from_env()
+setup_logging(log_level=config.log_level, log_format=config.log_format)
+logger = logging.getLogger("kubeguard-api")
+
 
 
 # -------------------------------------------------------------
@@ -74,35 +82,26 @@ class PrometheusConnectionError(Exception):
 class PredictionOrchestrator:
     """Orchestrator to coordinate metrics collection, feature calculation, ML anomaly detection, and risk rules."""
 
-    def __init__(self) -> None:
-        # Configuration
-        prometheus_url = os.environ.get("PROMETHEUS_URL", "http://localhost:9090")
-        logger.info(f"Initializing PrometheusClient with URL: {prometheus_url}")
+    def __init__(self, cfg: KubeGuardConfig | None = None) -> None:
+        self.config = cfg or KubeGuardConfig.from_env()
+        logger.info(f"Initializing PrometheusClient with URL: {self.config.prometheus_url}")
 
-        self.client = PrometheusClient(base_url=prometheus_url)
+
+        self.client = PrometheusClient(base_url=self.config.prometheus_url)
         self.collector = Collector(self.client)
         self.feature_service = FeatureService(self.client)
         self.detector = IsolationForestDetector(contamination=0.1, random_state=42)
         self.rule_engine = RuleEngine()
 
         # Persistent storage & model stores
-        self.feature_store = FeatureStore()
-        self.model_store = ModelStore()
+        self.feature_store = FeatureStore(db_path=self.config.feature_store_path)
+        self.model_store = ModelStore(model_path=self.config.model_path)
 
         # Training threshold & retraining configs
-        min_samples_str = os.environ.get("MIN_TRAINING_SAMPLES", "50")
-        try:
-            self.min_training_samples = int(min_samples_str)
-        except ValueError:
-            self.min_training_samples = 50
-
-        retrain_int_str = os.environ.get("MODEL_RETRAIN_INTERVAL_SECONDS", "3600")
-        try:
-            self.model_retrain_interval_seconds = float(retrain_int_str)
-        except ValueError:
-            self.model_retrain_interval_seconds = 3600.0
-
+        self.min_training_samples = self.config.min_training_samples
+        self.model_retrain_interval_seconds = self.config.model_retrain_interval_seconds
         self.last_retrain_time = 0.0
+
 
     def initialize_model(self) -> bool:
         """Initialize Isolation Forest detector from disk artifact, real history, or bootstrap fallback."""
@@ -247,58 +246,67 @@ class PredictionOrchestrator:
         Returns:
             A RiskResult object.
         """
-        # 1. Verify Prometheus availability
+        start_time_pred = time.time()
         try:
-            self.client.query("up")
-        except Exception as conn_err:
-            raise PrometheusConnectionError(f"Prometheus is unreachable: {conn_err}")
+            # 1. Verify Prometheus availability
+            try:
+                self.client.query("up")
+            except Exception as conn_err:
+                raise PrometheusConnectionError(f"Prometheus is unreachable: {conn_err}")
 
-        # 2. Verify Pod existence
-        pods = self.collector._discover_pods(namespace)
-        pod_names = [p[0] for p in pods]
-        if pod not in pod_names:
-            raise PodNotFoundError(f"Pod '{pod}' not found in namespace '{namespace}'")
+            # 2. Verify Pod existence
+            pods = self.collector._discover_pods(namespace)
+            pod_names = [p[0] for p in pods]
+            if pod not in pod_names:
+                raise PodNotFoundError(f"Pod '{pod}' not found in namespace '{namespace}'")
 
-        # 3. Handle model fit fallback on-demand
-        if not self.detector.is_fitted:
-            logger.info("Model not trained yet. Trying to fit model on-demand...")
-            trained = self.initialize_model()
-            if not trained:
-                raise RuntimeError("Failed to initialize baseline anomaly model. Cannot perform prediction.")
+            # 3. Handle model fit fallback on-demand
+            if not self.detector.is_fitted:
+                logger.info("Model not trained yet. Trying to fit model on-demand...")
+                trained = self.initialize_model()
+                if not trained:
+                    raise RuntimeError("Failed to initialize baseline anomaly model. Cannot perform prediction.")
 
-        # 4. Fetch metrics and compute features
-        now = time.time()
-        start_time = now - 15 * 60
-        cpu_h = self.feature_service.get_cpu_history(namespace, start_time, now, 60)
-        mem_h = self.feature_service.get_memory_history(namespace, start_time, now, 60)
-        restarts = self.collector._get_restart_count(namespace)
+            # 4. Fetch metrics and compute features
+            now = time.time()
+            start_time = now - 15 * 60
+            cpu_h = self.feature_service.get_cpu_history(namespace, start_time, now, 60)
+            mem_h = self.feature_service.get_memory_history(namespace, start_time, now, 60)
+            restarts = self.collector._get_restart_count(namespace)
 
-        features_list = self.feature_service.calculate_features(cpu_h, mem_h, restarts)
+            features_list = self.feature_service.calculate_features(cpu_h, mem_h, restarts)
 
-        # Match current pod features
-        pod_features = None
-        for f in features_list:
-            if f.pod == pod:
-                pod_features = f
-                break
+            # Match current pod features
+            pod_features = None
+            for f in features_list:
+                if f.pod == pod:
+                    pod_features = f
+                    break
 
-        if not pod_features:
-            raise PodNotFoundError(f"No metric feature history found for pod '{pod}' in namespace '{namespace}'")
+            if not pod_features:
+                raise PodNotFoundError(f"No metric feature history found for pod '{pod}' in namespace '{namespace}'")
 
-        # 5. Persist observation to FeatureStore
-        try:
-            self.feature_store.save_feature(pod_features)
-        except Exception as store_err:
-            logger.error(f"Error persisting feature observation to FeatureStore: {store_err}")
+            # 5. Persist observation to FeatureStore
+            try:
+                self.feature_store.save_feature(pod_features)
+            except Exception as store_err:
+                logger.error(f"Error persisting feature observation to FeatureStore: {store_err}")
 
-        # 6. Run anomaly detection and rule engine
-        anomaly_res = self.detector.predict(pod_features)
-        risk_res = self.rule_engine.evaluate(pod_features, anomaly_res)
+            # 6. Run anomaly detection and rule engine
+            anomaly_res = self.detector.predict(pod_features)
+            risk_res = self.rule_engine.evaluate(pod_features, anomaly_res)
 
-        # 7. Update Prometheus metrics
-        update_pod_metrics(pod_features, anomaly_res, risk_res)
+            # 7. Update Prometheus metrics
+            update_pod_metrics(pod_features, anomaly_res, risk_res)
 
-        return risk_res
+            duration = time.time() - start_time_pred
+            kubeguard_prediction_duration_seconds.labels(namespace=namespace).observe(duration)
+            kubeguard_pod_predictions_total.labels(namespace=namespace, result="success").inc()
+            return risk_res
+
+        except Exception as e:
+            kubeguard_pod_predictions_total.labels(namespace=namespace, result="failure").inc()
+            raise e
 
 
 # -------------------------------------------------------------
@@ -307,18 +315,20 @@ class PredictionOrchestrator:
 app = FastAPI(
     title="KubeGuard AI Prediction Service",
     description="REST API to serve real-time anomaly detection and operational risk scores for Kubernetes pods.",
-    version="1.0.0"
+    version="0.1.4"
 )
 
 # Instantiate orchestrator and background worker
 from worker import MonitoringWorker
 
-orchestrator = PredictionOrchestrator()
-worker = MonitoringWorker(orchestrator)
+orchestrator = PredictionOrchestrator(config)
+worker = MonitoringWorker(orchestrator, config)
 
 
 @app.on_event("startup")
 def startup_event():
+    # Log configuration summary
+    config.log_summary(logger)
     # Attempt to train baseline model on startup
     orchestrator.initialize_model()
     # Start background monitoring worker
@@ -337,11 +347,27 @@ def shutdown_event():
 @app.get("/health")
 def health():
     """Verify that the FastAPI service is healthy."""
+    now = time.time()
+    worker_status = "healthy"
+    if worker.last_success_timestamp > 0 and (now - worker.last_success_timestamp) > worker.health_timeout:
+        worker_status = "degraded"
+
     return {
         "status": "healthy",
+        "worker": worker_status,
         "model_source": orchestrator.detector.model_source,
         "model_version": orchestrator.detector.model_version,
     }
+
+
+@app.get("/ready")
+def ready(response: Response):
+    """Readiness endpoint verifying application initialization and background worker state."""
+    if worker._thread is not None and worker._thread.is_alive():
+        return {"status": "ready"}
+    response.status_code = 530
+    return {"status": "not ready"}
+
 
 
 @app.get(

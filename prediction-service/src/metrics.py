@@ -1,4 +1,9 @@
-from prometheus_client import Gauge
+import time
+from prometheus_client import Counter, Gauge, Histogram
+
+# ---------------------------------------------------------------------------
+# Workload Telemetry Metrics (Step 10-16)
+# ---------------------------------------------------------------------------
 
 # 1. Risk score
 kubeguard_pod_risk_score = Gauge(
@@ -41,6 +46,132 @@ kubeguard_pod_restart_count = Gauge(
     "Number of restarts of the pod",
     ["namespace", "pod"]
 )
+
+
+# ---------------------------------------------------------------------------
+# Platform Self-Observability Metrics (Step 17)
+# ---------------------------------------------------------------------------
+
+# Monitoring Worker Metrics
+kubeguard_monitoring_cycles_total = Counter(
+    "kubeguard_monitoring_cycles_total",
+    "Total monitoring cycles executed"
+)
+kubeguard_monitoring_cycle_failures_total = Counter(
+    "kubeguard_monitoring_cycle_failures_total",
+    "Total monitoring cycle failures"
+)
+kubeguard_monitoring_cycle_duration_seconds = Histogram(
+    "kubeguard_monitoring_cycle_duration_seconds",
+    "Monitoring cycle execution duration in seconds"
+)
+
+# Prediction Metrics
+kubeguard_pod_predictions_total = Counter(
+    "kubeguard_pod_predictions_total",
+    "Total pod predictions evaluated",
+    ["namespace", "result"]
+)
+kubeguard_prediction_duration_seconds = Histogram(
+    "kubeguard_prediction_duration_seconds",
+    "Prediction execution duration in seconds",
+    ["namespace"]
+)
+
+# Feature Store Metrics
+kubeguard_feature_store_observations_total = Counter(
+    "kubeguard_feature_store_observations_total",
+    "Feature observations successfully stored"
+)
+kubeguard_feature_store_errors_total = Counter(
+    "kubeguard_feature_store_errors_total",
+    "Feature store operation failures"
+)
+kubeguard_feature_store_records = Gauge(
+    "kubeguard_feature_store_records",
+    "Current number of stored feature observations"
+)
+
+# Model Lifecycle Metrics
+kubeguard_model_training_total = Counter(
+    "kubeguard_model_training_total",
+    "Model training executions",
+    ["source"]
+)
+kubeguard_model_training_duration_seconds = Histogram(
+    "kubeguard_model_training_duration_seconds",
+    "Model training duration in seconds",
+    ["source"]
+)
+kubeguard_model_load_total = Counter(
+    "kubeguard_model_load_total",
+    "Model load attempts",
+    ["result"]
+)
+kubeguard_model_info = Gauge(
+    "kubeguard_model_info",
+    "Active Isolation Forest model state and provenance",
+    ["source", "version"]
+)
+
+# Worker Health & Timestamps
+kubeguard_worker_last_success_timestamp = Gauge(
+    "kubeguard_worker_last_success_timestamp",
+    "Unix timestamp of the last successful monitoring cycle"
+)
+kubeguard_worker_last_cycle_timestamp = Gauge(
+    "kubeguard_worker_last_cycle_timestamp",
+    "Unix timestamp of the most recent monitoring cycle"
+)
+kubeguard_worker_pods_evaluated = Gauge(
+    "kubeguard_worker_pods_evaluated",
+    "Number of pods evaluated in the most recent monitoring cycle"
+)
+kubeguard_worker_healthy = Gauge(
+    "kubeguard_worker_healthy",
+    "Monitoring worker health state (1 = healthy, 0 = unhealthy)"
+)
+
+# Configuration Info
+kubeguard_config_info = Gauge(
+    "kubeguard_config_info",
+    "Active KubeGuard configuration info",
+    ["monitor_interval_seconds", "retention_days", "min_training_samples", "retrain_interval_seconds"]
+)
+
+
+def set_model_info_metric(source: str, version: int) -> None:
+    """Clear stale model_info metrics and record active model state."""
+    try:
+        kubeguard_model_info.clear()
+    except Exception:
+        pass
+    kubeguard_model_info.labels(source=source, version=str(version)).set(1)
+
+
+def update_worker_health_metric(last_success_timestamp: float, timeout_seconds: float = 90.0) -> None:
+    """Update worker health gauge based on last successful monitoring cycle time."""
+    if last_success_timestamp > 0 and (time.time() - last_success_timestamp) <= timeout_seconds:
+        kubeguard_worker_healthy.set(1)
+    else:
+        kubeguard_worker_healthy.set(0)
+
+
+def set_config_info_metric(
+    interval_seconds: float, retention_days: int, min_samples: int, retrain_interval: float
+) -> None:
+    """Publish configuration gauge labels."""
+    try:
+        kubeguard_config_info.clear()
+    except Exception:
+        pass
+    kubeguard_config_info.labels(
+        monitor_interval_seconds=str(interval_seconds),
+        retention_days=str(retention_days),
+        min_training_samples=str(min_samples),
+        retrain_interval_seconds=str(retrain_interval),
+    ).set(1)
+
 
 
 def update_pod_metrics(features, anomaly, risk) -> None:

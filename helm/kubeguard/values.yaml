@@ -9,8 +9,16 @@ replicaCount: 1
 
 image:
   repository: kubeguard-prediction-service
-  tag: "0.1.3"
+  tag: "0.1.4"
   pullPolicy: IfNotPresent
+
+logging:
+  level: "INFO"
+  format: "text"
+
+worker:
+  healthTimeoutSeconds: 90
+
 
 service:
   type: ClusterIP

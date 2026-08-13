@@ -26,8 +26,9 @@ class TestMonitoringWorker(unittest.TestCase):
 
         orchestrator = MagicMock()
         worker = MonitoringWorker(orchestrator)
-        self.assertEqual(worker.interval, 60.0)
-        self.assertEqual(worker.namespaces, ["demo"])
+        self.assertEqual(worker.interval, 30.0)
+        self.assertEqual(worker.namespaces, ["demo", "kubeguard-test"])
+
 
     def test_worker_custom_configuration(self):
         """Verify custom environment configuration parameters."""

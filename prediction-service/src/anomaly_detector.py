@@ -24,6 +24,13 @@ from feature_service import FeatureService, PodFeatures, MetricSample, PodMetric
 # Import scikit-learn
 from sklearn.ensemble import IsolationForest
 
+from metrics import (
+    kubeguard_model_training_total,
+    kubeguard_model_training_duration_seconds,
+    set_model_info_metric,
+)
+
+
 
 @dataclass
 class AnomalyResult:
@@ -100,12 +107,19 @@ class IsolationForestDetector:
         for f in training_features:
             X.append(self._extract_feature_vector(f))
 
+        start_time = time.time()
         self.model.fit(X)
+        duration = time.time() - start_time
+
         self.is_fitted = True
         self.model_source = source
         self.model_version = version
         self.training_sample_count = len(X)
         self.trained_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        kubeguard_model_training_total.labels(source=source).inc()
+        kubeguard_model_training_duration_seconds.labels(source=source).observe(duration)
+        set_model_info_metric(source=source, version=version)
 
     def fit_vectors(self, X: List[List[float]], source: str = "historical", version: int = 1) -> None:
         """Train the model directly on a 2D matrix of numerical feature vectors.
@@ -118,12 +132,19 @@ class IsolationForestDetector:
         if not X:
             raise ValueError("Training vector matrix cannot be empty.")
 
+        start_time = time.time()
         self.model.fit(X)
+        duration = time.time() - start_time
+
         self.is_fitted = True
         self.model_source = source
         self.model_version = version
         self.training_sample_count = len(X)
         self.trained_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+        kubeguard_model_training_total.labels(source=source).inc()
+        kubeguard_model_training_duration_seconds.labels(source=source).observe(duration)
+        set_model_info_metric(source=source, version=version)
 
     def set_fitted_model(self, model: IsolationForest, metadata: dict) -> None:
         """Attach a pre-loaded, persisted IsolationForest model artifact and metadata."""
@@ -133,6 +154,9 @@ class IsolationForestDetector:
         self.model_version = metadata.get("model_version", 1)
         self.training_sample_count = metadata.get("training_sample_count", 0)
         self.trained_at = metadata.get("trained_at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+
+        set_model_info_metric(source=self.model_source, version=self.model_version)
+
 
 
     def predict(self, observation: PodFeatures) -> AnomalyResult:

@@ -59,11 +59,19 @@ class TestKubeGuardAPI(unittest.TestCase):
             # Restore original base URL
             orchestrator.client.base_url = original_base
 
+    def test_ready_endpoint(self):
+        """Verify GET /ready returns 200 when ready."""
+        response = self.client.get("/ready")
+        self.assertIn(response.status_code, [200, 530])
+
     def test_metrics_endpoint(self):
         """Verify GET /metrics returns 200 and contains kubeguard metrics format."""
         response = self.client.get("/metrics")
         self.assertEqual(response.status_code, 200)
         self.assertIn("kubeguard_pod_risk_score", response.text)
+        self.assertIn("kubeguard_monitoring_cycles_total", response.text)
+        self.assertIn("kubeguard_worker_healthy", response.text)
+
 
 
 

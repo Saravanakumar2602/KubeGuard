@@ -205,6 +205,7 @@ Everything else from the full enterprise version (Kafka, Spark/Flink, Elasticsea
 | 7 | Reusable Helm Chart packaging & dynamic parameter overrides | **Completed** |
 | 8 | Command-Line Interface (`kubeguard`) management layer | **Completed** |
 | 9 | Historical Feature Store (SQLite) & Model Lifecycle (`joblib`) | **Completed** |
+| 10 | Configuration & Observability Hardening (Self-Metrics, JSON Logs, Alerts) | **Completed** |
 
 ---
 
@@ -220,6 +221,21 @@ KubeGuard learns from historical workload telemetry over time to provide operati
 For architectural details, see [docs/MODEL_LIFECYCLE.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/MODEL_LIFECYCLE.md).
 
 ---
+
+## KubeGuard Self-Observability
+
+KubeGuard monitors Kubernetes workloads AND exposes operational telemetry describing KubeGuard's own health:
+
+- **Centralized Configuration**: Strict environment variable validation (`config.py`) with sanitized startup summary logging.
+- **Structured Logging**: Configurable text or JSON formatting (`LOG_FORMAT=text|json`) for seamless log aggregator ingestion.
+- **Internal Self-Metrics**: 17 `kubeguard_*` Prometheus metrics tracking cycle execution, prediction latency, feature store records, model provenance, and worker health.
+- **Worker Health & Readiness**: Operational health tracking (`WORKER_HEALTH_TIMEOUT_SECONDS=90`) with dedicated `GET /ready` probe endpoint.
+- **Operational Self-Alerting**: PrometheusRules for worker health (`KubeGuardWorkerDown`), cycle failures (`KubeGuardMonitoringFailures`), and prediction failures (`KubeGuardPredictionFailures`).
+
+For full self-observability details, see [docs/OBSERVABILITY.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/OBSERVABILITY.md).
+
+---
+
 
 
 ## KubeGuard CLI
