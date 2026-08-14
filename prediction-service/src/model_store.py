@@ -29,6 +29,9 @@ DEFAULT_FEATURE_NAMES = [
 ]
 
 
+from metrics import kubeguard_model_load_total
+
+
 class ModelStore:
     """Manages model artifact serialization, loading, and metadata tracking."""
 
@@ -116,6 +119,7 @@ class ModelStore:
             Tuple of (IsolationForest model object, metadata dict). Returns (None, None) if missing or invalid.
         """
         if not self.exists():
+            kubeguard_model_load_total.labels(result="missing").inc()
             return None, None
 
         with self._lock:
@@ -126,13 +130,17 @@ class ModelStore:
                         f"Loaded persisted model from {self.model_path} "
                         f"(version={payload['metadata'].get('model_version')}, source={payload['metadata'].get('model_source')})"
                     )
+                    kubeguard_model_load_total.labels(result="success").inc()
                     return payload["model"], payload["metadata"]
                 else:
                     logger.warning(f"Corrupted model file structure at {self.model_path}")
+                    kubeguard_model_load_total.labels(result="failure").inc()
                     return None, None
             except Exception as e:
                 logger.error(f"Error loading model artifact from {self.model_path}: {e}")
+                kubeguard_model_load_total.labels(result="failure").inc()
                 return None, None
+
 
     def get_metadata(self) -> Optional[Dict[str, Any]]:
         """Read model metadata without deserializing full model pipeline."""

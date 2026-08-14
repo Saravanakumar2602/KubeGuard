@@ -12,8 +12,10 @@ from kubeguard_cli.commands import (
     status as status_cmd,
     pods as pods_cmd,
     alerts as alerts_cmd,
+    incidents as incidents_cmd,
     uninstall as uninstall_cmd,
 )
+
 
 # ---------------------------------------------------------------------------
 # Global state passed to sub-commands via Typer callback
@@ -76,7 +78,9 @@ app.command("install")(install_cmd.install)
 app.command("status")(status_cmd.status)
 app.command("pods")(pods_cmd.pods)
 app.command("alerts")(alerts_cmd.alerts)
+app.command("incidents")(incidents_cmd.incidents)
 app.command("uninstall")(uninstall_cmd.uninstall)
+
 
 
 # ---------------------------------------------------------------------------

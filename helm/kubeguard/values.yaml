@@ -9,8 +9,22 @@ replicaCount: 1
 
 image:
   repository: kubeguard-prediction-service
-  tag: "0.1.3"
+  tag: "0.1.5"
   pullPolicy: IfNotPresent
+
+logging:
+  level: "INFO"
+  format: "text"
+
+worker:
+  healthTimeoutSeconds: 90
+
+incident:
+  resolutionGraceSeconds: 120
+  retentionDays: 30
+
+alertmanager:
+  url: "http://kube-prometheus-stack-alertmanager.monitoring.svc:9093"
 
 service:
   type: ClusterIP
@@ -52,4 +66,5 @@ prometheusRule:
 
 grafanaDashboard:
   enabled: true
+
 

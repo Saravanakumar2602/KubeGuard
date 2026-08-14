@@ -12,4 +12,12 @@ data:
   MODEL_PATH: "/data/kubeguard-isolation-forest.joblib"
   MIN_TRAINING_SAMPLES: "50"
   MODEL_RETRAIN_INTERVAL_SECONDS: "3600"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "text"
+  WORKER_HEALTH_TIMEOUT_SECONDS: "90"
+  ALERTMANAGER_URL: "http://kube-prometheus-stack-alertmanager.monitoring.svc:9093"
+  INCIDENT_RESOLUTION_GRACE_SECONDS: "120"
+  INCIDENT_RETENTION_DAYS: "30"
+
+
 

@@ -1,7 +1,9 @@
 """KubeGuard CLI package."""
 
 CLI_VERSION = "0.1.0"
-CHART_APP_VERSION = "0.1.2"
+CHART_APP_VERSION = "0.1.5"
+
+
 DEFAULT_NAMESPACE = "kubeguard"
 DEFAULT_RELEASE = "kubeguard"
 DEFAULT_CHART_PATH = "helm/kubeguard"

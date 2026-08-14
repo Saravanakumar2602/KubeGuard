@@ -14,4 +14,12 @@ data:
   MODEL_PATH: {{ .Values.persistence.modelPath | quote }}
   MIN_TRAINING_SAMPLES: {{ .Values.model.minTrainingSamples | quote }}
   MODEL_RETRAIN_INTERVAL_SECONDS: {{ .Values.model.retrainIntervalSeconds | quote }}
+  LOG_LEVEL: {{ .Values.logging.level | quote }}
+  LOG_FORMAT: {{ .Values.logging.format | quote }}
+  WORKER_HEALTH_TIMEOUT_SECONDS: {{ .Values.worker.healthTimeoutSeconds | quote }}
+  ALERTMANAGER_URL: {{ .Values.alertmanager.url | quote }}
+  INCIDENT_RESOLUTION_GRACE_SECONDS: {{ .Values.incident.resolutionGraceSeconds | quote }}
+  INCIDENT_RETENTION_DAYS: {{ .Values.incident.retentionDays | quote }}
+
+
 

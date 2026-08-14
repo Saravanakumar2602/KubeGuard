@@ -53,3 +53,31 @@ spec:
       annotations:
         summary: "KubeGuard detected critical pod restarts"
         description: "Pod {{ $labels.exported_pod }} in namespace {{ $labels.exported_namespace }} has restarted {{ $value }} times, exceeding the critical restart threshold of 4."
+
+    - alert: KubeGuardWorkerDown
+      expr: kubeguard_worker_healthy == 0
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "KubeGuard background monitoring worker is unhealthy"
+        description: "KubeGuard worker monitoring activity has exceeded the health timeout threshold."
+
+    - alert: KubeGuardMonitoringFailures
+      expr: increase(kubeguard_monitoring_cycle_failures_total[5m]) > 2
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "KubeGuard monitoring cycle failures detected"
+        description: "KubeGuard encountered {{ $value }} monitoring cycle failures in the last 5 minutes."
+
+    - alert: KubeGuardPredictionFailures
+      expr: increase(kubeguard_pod_predictions_total{result="failure"}[5m]) > 5
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "KubeGuard pod prediction failures detected"
+        description: "KubeGuard recorded {{ $value }} pod prediction failures in namespace {{ $labels.namespace }} over the last 5 minutes."
+

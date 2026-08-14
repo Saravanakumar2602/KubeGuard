@@ -63,6 +63,37 @@ spec:
             configMapKeyRef:
               name: {{ include "kubeguard.fullname" . }}-config
               key: MODEL_RETRAIN_INTERVAL_SECONDS
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: LOG_LEVEL
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: LOG_FORMAT
+        - name: WORKER_HEALTH_TIMEOUT_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: WORKER_HEALTH_TIMEOUT_SECONDS
+        - name: ALERTMANAGER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: ALERTMANAGER_URL
+        - name: INCIDENT_RESOLUTION_GRACE_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: INCIDENT_RESOLUTION_GRACE_SECONDS
+        - name: INCIDENT_RETENTION_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: INCIDENT_RETENTION_DAYS
+
         {{- if .Values.persistence.enabled }}
         volumeMounts:
         - name: data-volume
@@ -78,10 +109,11 @@ spec:
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ready
             port: 8000
           initialDelaySeconds: 10
           periodSeconds: 5
+
       {{- if .Values.persistence.enabled }}
       volumes:
       - name: data-volume
