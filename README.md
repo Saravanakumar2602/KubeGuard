@@ -1,53 +1,62 @@
-# Kubernetes Health AI — Fresher-Friendly Build Plan
-### An AI-Powered Cluster Observability & Predictive Scaling Platform
+# KubeGuard AI — Kubernetes Workload Health & Risk Observatory
+
+[![Application Version](https://img.shields.io/badge/KubeGuard%20App-v0.1.5-blue.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/Chart.yaml)
+[![Helm Chart](https://img.shields.io/badge/Helm%20Chart-v0.1.5-green.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/Chart.yaml)
+[![CLI Version](https://img.shields.io/badge/CLI-v0.1.0-orange.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/cli/README.md)
+[![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/LICENSE)
 
 ---
 
-> Let me take you on a journey through this project!
-> This isn't just a monitoring tool — it's a complete AI layer on top of your Kubernetes cluster that predicts failures before they happen.
+## What is KubeGuard?
+
+**KubeGuard AI** is an AI-assisted Kubernetes workload health and risk monitoring application. It continuously monitors Kubernetes workloads, detects resource anomalies and degradation trends, calculates operational risk scores, and correlates alerts into actionable incident contexts.
+
+KubeGuard:
+- **Collects Telemetry**: Scrapes Kubernetes workload metrics via Prometheus (`kubelet` + `kube-state-metrics`).
+- **Feature Engineering**: Computes CPU rate, memory usage, restart counts, and linear trend slopes (bytes/sec and cores/sec).
+- **Unsupervised Anomaly Detection**: Uses Isolation Forest models (`scikit-learn`) to detect statistical resource anomalies without manual baseline labels.
+- **Rule Engine**: Combines ML anomaly signals with deterministic operational rules to produce a 0–100 risk score and `LOW`, `MEDIUM`, or `HIGH` risk levels.
+- **Continuous Background Monitoring**: Periodically evaluates configured target namespaces.
+- **Event & Incident Correlation**: Correlates ML signals, metric trends, and Prometheus Alertmanager alerts into persistent incident records with chronological timeline state events.
+- **Persistent Storage**: Stores historical feature observations, versioned ML models (`joblib`), and incident history using persistent storage (`PersistentVolumeClaim` / SQLite).
+- **Self-Observability**: Exposes internal operational telemetry (`kubeguard_*` metrics) for Prometheus/Grafana and tracks background worker health.
+- **Operator CLI**: Includes a command-line interface (`kubeguard`) for installation, status checking, pod risk inspection, and incident tracking.
+
+> [!IMPORTANT]
+> **KubeGuard is NOT a Python library.** It is distributed as a Kubernetes-native application using a container image and a Helm chart.
 
 ---
 
-## Table of Contents
+## How KubeGuard is Distributed
 
-- [The Big Picture: What We've Created](#the-big-picture-what-weve-created)
-- [The Architecture: A Symphony of Modern Tech](#the-architecture-a-symphony-of-modern-tech)
-- [Worker (Pod) Monitoring Experience](#worker-pod-monitoring-experience)
-  - [Data Collection](#data-collection)
-  - [ML Models](#ml-models)
-  - [Rule Engine](#rule-engine)
-  - [FastAPI Prediction Server](#fastapi-prediction-server)
-  - [Grafana Dashboard](#grafana-dashboard)
-  - [Design Principles](#design-principles)
-  - [System Logic](#system-logic)
-- [Tech Stack (Only 5 Things to Learn)](#tech-stack-only-5-things-to-learn)
-- [Suggested Build Timeline](#suggested-build-timeline)
-- [Architecture Documentation](#architecture-documentation)
-- [What to Say in Your Report About Scaling This Up](#what-to-say-in-your-report-about-scaling-this-up)
+KubeGuard cleanly separates developer artifact packaging from end-user cluster installation:
 
----
+```text
+Developer / Build Side                                   User Cluster Deployment
+──────────────────────                                   ───────────────────────
+KubeGuard Source Code
+        │
+        ├──► Docker Container Image ──► Container Registry ──┐
+        │    (kubeguard-prediction-service:0.1.5)           │
+        │                                                    ▼
+        └──► Helm Chart Packaging   ──► Helm Repository ──► Helm Release (Deployment / PVC)
+             (helm/kubeguard)                                │
+                                                             ▼
+                                                    KubeGuard Operator CLI
+                                                    (kubeguard)
+```
 
-## The Big Picture: What We've Created
-
-Imagine you're running a production Kubernetes cluster.
-Pods are crashing, memory is leaking, CPU is spiking — and you find out *after* the outage.
-
-Kubernetes Health AI is your intelligent cluster guardian — an ML-powered observability platform that:
-
-- Watches every pod with real-time Prometheus metrics
-- Detects CPU spikes and memory leaks before they cause failures
-- Recommends scaling actions in plain English
-- Serves predictions instantly via a REST API
-- Displays everything on a live Grafana dashboard
+- **Developer Workflow**: Source code is containerized into a lightweight Docker image (`kubeguard-prediction-service:0.1.5`) and packaged into a versioned Helm chart (`helm/kubeguard`).
+- **User Installation**: Site Reliability Engineers (SREs) and cluster operators deploy KubeGuard into any Kubernetes cluster using `helm install` or the `kubeguard` CLI — without needing Python runtime setups or building container images.
 
 ---
 
-## The Architecture: A Symphony of Modern Tech
+## System Architecture
 
 ```mermaid
 flowchart TD
     subgraph Kubernetes Cluster
-        K8s["☸️ Pods (demo/kubeguard-test)"]
+        K8s["☸️ Monitored Pods (demo/kubeguard-test)"]
         ServiceMonitor["⚙️ ServiceMonitor Target"]
         PromRule["🔔 PrometheusRule Alerting"]
     end
@@ -58,143 +67,125 @@ flowchart TD
         Grafana["📈 Grafana Dashboard"]
     end
 
-    subgraph KubeGuard Release (Helm)
-        Worker["⚙️ Background Monitor Worker"]
-        Exporter["⚙️ Exporter (/metrics)"]
-        PredictAPI["🐍 FastAPI Prediction Service"]
+    subgraph KubeGuard Application Release (Helm)
+        Worker["⚙️ Background Monitoring Worker"]
+        SQLite["💾 Feature & Incident Store (/data/kubeguard.db)"]
+        ModelStore["💾 Persisted ML Model (/data/kubeguard-isolation-forest.joblib)"]
+        PredictAPI["🐍 FastAPI Prediction Server"]
+        CLI["🛠️ KubeGuard CLI (kubeguard)"]
     end
 
     K8s -->|CPU/Memory/Restarts| Prometheus
-    Prometheus -->|Scrapes Exporter Target| Exporter
+    Prometheus -->|Scrapes Exporter Target| PredictAPI
     Prometheus -->|Historical Range Queries| PredictAPI
-    PredictAPI -->|Features pipeline| Worker
-    Worker -->|Scoring & Anomaly Check| Exporter
-    ServiceMonitor -->|Discovers scrape target| Exporter
-    PromRule -->|Risk Alerts (Risk >= 60)| Prometheus
-    Prometheus -->|Routes alerts| Alertmanager
-    Grafana -->|Queries Metrics| Prometheus
+    PredictAPI -->|Computes Features| Worker
+    Worker -->|Saves Observations| SQLite
+    Worker -->|Fits / Loads Model| ModelStore
+    Worker -->|Evaluates Risk & Incidents| SQLite
+    Prometheus -->|Routes Firing Alerts| Alertmanager
+    Worker -->|Correlates Firing Alerts| Alertmanager
+    Grafana -->|Queries Self & Workload Metrics| Prometheus
+    CLI -->|Queries API / Metrics / Helm| PredictAPI
 ```
 
-> An AI-powered cluster guardian, packaged as a reusable Helm chart,
-> predicting resource degradation and raising alerts automatically.
+---
+
+## Key Capabilities & Core Modules
+
+### 1. ML Model Lifecycle & Telemetry Store
+KubeGuard accumulates real cluster telemetry over time to transition from a bootstrap baseline to a custom historical model:
+- **Bootstrap Model**: Fresh deployments initialize an Isolation Forest model using synthetic perturbation fallback so anomaly scoring functions immediately.
+- **Historical Feature Store**: Routine monitoring scans record pod feature vectors in an embedded SQLite database (`/data/kubeguard.db`).
+- **Historical Model Training**: When stored observations cross `MIN_TRAINING_SAMPLES` (default: 50), KubeGuard automatically fits a historical model on real workload behavior.
+- **Model Artifact Persistence**: Fitted models are saved via `joblib` (`/data/kubeguard-isolation-forest.joblib`) with version metadata. Data persists across pod restarts via a Kubernetes `PersistentVolumeClaim`.
+
+For details, see [docs/MODEL_LIFECYCLE.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/MODEL_LIFECYCLE.md).
 
 ---
 
-## Worker (Pod) Monitoring Experience
+### 2. Event Correlation & Incident Context
+KubeGuard transforms isolated risk signals and Prometheus alerts into coherent incident contexts:
+- **Signal Correlation**: Combines resource trend slopes, restart spikes, and ML anomaly results into active signals.
+- **Deduplication**: Active incidents are uniquely identified by `(namespace, pod)`. Multiple monitoring cycles update the same ongoing active incident.
+- **Timeline Generation**: Emits chronological state transition events (`incident_created`, `risk_escalated`, `ml_anomaly_detected`, `alert_fired`, `incident_resolved`).
+- **Alertmanager Integration**: Correlates firing and resolved Prometheus alerts with active pod incidents.
+- **Resolution Grace Period**: Configurable grace window (`INCIDENT_RESOLUTION_GRACE_SECONDS=120`) prevents incident flapping on transient scrape drops.
 
-[ Metrics Collection ] → [ Feature Extraction ] → [ ML Scoring ] → [ Dashboard ]
-
----
-
-<a name="data-collection"></a>
-
-![Data Collection](https://img.shields.io/badge/Section-Data%20Collection-blue)
-
-| Stage | Description | Experience |
-|---|---|---|
-| Metrics Scraping | Prometheus pulls kubelet + kube-state-metrics | Automatic, every 15s |
-| Feature Extraction | Python CronJob builds per-pod features | Runs every few minutes |
-| Feature Store | PostgreSQL table or CSV | Simple and queryable |
-| Prediction | Isolation Forest + Linear Regression | Trains in seconds |
+For details, see [docs/INCIDENT_CORRELATION.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/INCIDENT_CORRELATION.md).
 
 ---
 
-<a name="ml-models"></a>
+### 3. KubeGuard Self-Observability
+KubeGuard monitors workloads AND exposes operational telemetry describing its own internal health:
+- **Centralized Configuration**: Strict environment variable parsing and validation (`config.py`) with startup summary logging.
+- **Structured Logging**: Configurable text or JSON log formatting (`LOG_FORMAT=text|json`).
+- **Self-Metrics**: 21 internal `kubeguard_*` Prometheus metrics tracking monitoring cycles, prediction latency, feature store records, model provenance, worker health, and active incidents.
+- **Readiness Probe**: Dedicated `GET /ready` probe verifying background worker thread health.
+- **Operational Self-Alerting**: PrometheusRules for worker health (`KubeGuardWorkerDown`), cycle failures (`KubeGuardMonitoringFailures`), and prediction failures (`KubeGuardPredictionFailures`).
 
-![ML Models](https://img.shields.io/badge/Section-ML%20Models-green)
-
-**Isolation Forest** — CPU/Memory Spike Detection
-- Unsupervised — no labeled failure data needed
-- Flags anomalous resource usage per pod
-- Works out of the box on collected metrics
-
-**Trend Detection** — Memory Leak Detection
-- Simple linear regression on memory-over-time
-- A leak = sustained upward slope, not a single spike
-- Catches gradual degradation before it crashes the pod
+For details, see [docs/OBSERVABILITY.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/OBSERVABILITY.md).
 
 ---
 
-<a name="rule-engine"></a>
+## Installation & Operator Guide
 
-![Rule Engine](https://img.shields.io/badge/Section-Rule%20Engine-orange)
+### Option A: Installation via KubeGuard CLI (Recommended)
 
-**Flow:**
-ML Signal → Rule Engine → Plain-English Recommendation
+#### 1. Install CLI
+```bash
+cd cli
+pip install .
+```
 
-- "CPU usage trending toward limit — consider increasing replicas from 3 to 5"
-- "Memory leak detected in pod `payments-7d9f` — investigate or restart"
-- "All systems nominal — no action required"
+#### 2. Deploy KubeGuard Release
+```bash
+# Perform pre-flight checks and install KubeGuard via Helm
+kubeguard install --interval 30 --namespaces demo,kubeguard-test
+```
 
----
+#### 3. Inspect Cluster & Incident Status
+```bash
+# Check installation and worker health status
+kubeguard status
 
-<a name="fastapi-prediction-server"></a>
+# View monitored pod risk scores
+kubeguard pods
+kubeguard pods --risk high
 
-![FastAPI Server](https://img.shields.io/badge/Section-FastAPI%20Prediction%20Server-red)
+# Inspect active correlated incidents
+kubeguard incidents
 
-- REST endpoint: `GET /predict/{pod_name}`
-- Returns risk score + scaling recommendation
-- A working API in ~30 lines of Python
-- Queryable by Grafana, Slack, or any dashboard
+# View detailed timeline and signals for an incident
+kubeguard incidents --id <incident-id>
 
----
-
-<a name="grafana-dashboard"></a>
-
-![Dashboard](https://img.shields.io/badge/Section-Grafana%20Dashboard-purple)
-
-### Risk Level
-- Low: Pod is healthy
-- Medium: Anomaly detected, monitor closely
-- High: Immediate action recommended
-
-### Pod Metrics
-- Average CPU usage vs. limit
-- Memory slope over time
-- Restart count in the last window
-
-### Alerts
-- Optional Slack webhook fires when a pod is flagged high-risk
+# View active Alertmanager alerts
+kubeguard alerts
+```
 
 ---
 
-<a name="design-principles"></a>
+### Option B: Direct Helm Chart Installation
 
-![Design Principles](https://img.shields.io/badge/Section-Design%20Principles-lightgrey)
+Deploy KubeGuard into the `kubeguard` namespace:
 
-- No deep learning required — scikit-learn only
-- No labeled failure data needed to get started
-- Runs entirely on a laptop (Minikube/Kind)
-- Modular — swap any component as you scale
-- Production upgrade path clearly defined
+```bash
+helm install kubeguard helm/kubeguard \
+  --namespace kubeguard \
+  --create-namespace \
+  --set monitoring.intervalSeconds=30 \
+  --set monitoring.namespaces="demo,kubeguard-test"
+```
 
----
-
-<a name="system-logic"></a>
-
-![System Logic](https://img.shields.io/badge/Section-System%20Logic-black)
-
-Cluster Metrics → Feature Engineering → ML Scoring → REST API → Live Dashboard
-
----
-
-## Tech Stack (Only 5 Things to Learn)
-
-| Concern | Technology | Why it's beginner-friendly |
-|---|---|---|
-| Metrics collection | Prometheus | One Helm chart install, huge documentation, industry standard |
-| Feature scripting | Python + pandas | You likely already know this |
-| ML models | scikit-learn (Isolation Forest + linear regression) | No deep learning needed, trains in seconds on a laptop |
-| Serving | FastAPI | A working REST API in ~30 lines of code |
-| Dashboard | Grafana | Drag-and-drop panels, no frontend code required |
-
-Everything else from the full enterprise version (Kafka, Spark/Flink, Elasticsearch, Airflow, custom Kubernetes Operator) is worth **mentioning as "future work"** in your report — it shows you understand how this would scale in production — but you don't need to build any of it.
+To uninstall:
+```bash
+helm uninstall kubeguard --namespace kubeguard
+```
 
 ---
 
-## Suggested Build Timeline (All Phases Completed)
+## Development Roadmap & Status Summary
 
-| Phase | Task | Status |
+| Phase | Description | Status |
 |---|---|---|
 | 1 | Prometheus Connectivity & Collector setup | **Completed** |
 | 2 | Feature engineering & linear regression trends | **Completed** |
@@ -210,162 +201,10 @@ Everything else from the full enterprise version (Kafka, Spark/Flink, Elasticsea
 
 ---
 
-## ML Model Lifecycle & Telemetry Store
+## Technical Documentation Index
 
-KubeGuard learns from historical workload telemetry over time to provide operational risk assessments and detect anomalous workload behavior.
-
-- **Bootstrap Model**: On fresh deployments, KubeGuard initializes an Isolation Forest baseline using synthetic perturbation fallback so anomaly scoring works immediately.
-- **Historical Feature Store**: Routine monitoring scans accumulate real pod feature observations in an embedded SQLite repository (`/data/kubeguard.db`).
-- **Historical Model Training**: When stored observations cross `MIN_TRAINING_SAMPLES` (default: 50), KubeGuard automatically trains a **Historical Model** on real cluster behavior.
-- **Model Artifact Persistence**: Fitted models are serialized using `joblib` (`/data/kubeguard-isolation-forest.joblib`) with versioned metadata (`model_version`, `trained_at`, `training_sample_count`). Data persists across pod restarts via a 1Gi Kubernetes `PersistentVolumeClaim`.
-
-For architectural details, see [docs/MODEL_LIFECYCLE.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/MODEL_LIFECYCLE.md).
-
----
-
-## KubeGuard Self-Observability
-
-KubeGuard monitors Kubernetes workloads AND exposes operational telemetry describing KubeGuard's own health:
-
-- **Centralized Configuration**: Strict environment variable validation (`config.py`) with sanitized startup summary logging.
-- **Structured Logging**: Configurable text or JSON formatting (`LOG_FORMAT=text|json`) for seamless log aggregator ingestion.
-- **Internal Self-Metrics**: 17 `kubeguard_*` Prometheus metrics tracking cycle execution, prediction latency, feature store records, model provenance, and worker health.
-- **Worker Health & Readiness**: Operational health tracking (`WORKER_HEALTH_TIMEOUT_SECONDS=90`) with dedicated `GET /ready` probe endpoint.
-- **Operational Self-Alerting**: PrometheusRules for worker health (`KubeGuardWorkerDown`), cycle failures (`KubeGuardMonitoringFailures`), and prediction failures (`KubeGuardPredictionFailures`).
-
-For full self-observability details, see [docs/OBSERVABILITY.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/OBSERVABILITY.md).
-
----
-
-## Event Correlation & Incident Context
-
-KubeGuard correlates anomaly signals, risk assessments, and Alertmanager events into persistent, operator-facing incident contexts:
-
-- **Signal Correlation**: Aggregates resource trend metrics, restart counts, and Isolation Forest ML anomaly classifications into active signals.
-- **Timeline Generation**: Records chronological state transitions (`incident_created`, `risk_escalated`, `ml_anomaly_detected`, `alert_fired`, `incident_resolved`).
-- **Alertmanager Integration**: Correlates firing and resolved Prometheus alerts directly with active pod incidents.
-- **Resolution Grace Period**: Configurable grace window (`INCIDENT_RESOLUTION_GRACE_SECONDS=120`) prevents flapping on temporary scrape drops.
-- **CLI & REST API Visibility**: Query incidents via `GET /incidents` or inspect detailed timelines using `kubeguard incidents --id <incident-id>`.
-
-For full incident correlation architecture, see [docs/INCIDENT_CORRELATION.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/INCIDENT_CORRELATION.md).
-
----
-
-
-
-
-## KubeGuard CLI
-
-KubeGuard includes a command-line interface (`kubeguard`) for installation, status inspection, pod risk monitoring, and alert tracking.
-
-### CLI Installation
-
-```bash
-cd cli
-pip install .
-```
-
-### Preferred User Journey
-
-```bash
-# 1. Verify CLI installation
-kubeguard version
-
-# 2. Pre-flight check & Install KubeGuard via Helm
-kubeguard install --interval 60 --namespaces demo,kubeguard-test
-
-# 3. Check real-time cluster installation status
-kubeguard status
-
-# 4. View monitored pod risk scores
-kubeguard pods
-kubeguard pods --risk high
-
-# 5. View active alerts from Alertmanager
-kubeguard alerts
-
-# 6. Uninstall KubeGuard release
-kubeguard uninstall
-```
-
-For full CLI options and documentation, see [cli/README.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/cli/README.md).
-
----
-
-## Helm Chart Installation
-
-KubeGuard is packaged as an installable Helm chart located at [helm/kubeguard](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/).
-
-### Quickstart
-Deploy KubeGuard into the `kubeguard` namespace:
-
-```bash
-helm install kubeguard helm/kubeguard \
-  --namespace kubeguard \
-  --create-namespace
-```
-
-### Configuration Overrides Example
-```bash
-helm install kubeguard helm/kubeguard \
-  --namespace kubeguard \
-  --create-namespace \
-  --set monitoring.intervalSeconds=60 \
-  --set monitoring.namespaces="demo"
-```
-
----
-
-
-
----
-
-## Architecture Documentation
-
-For comprehensive technical details about the system design, including:
-
-- Data flow diagrams with component interactions
-- Feature engineering pipeline and schema
-- ML model training and inference details
-- FastAPI endpoint specifications
-
-👉 [View Complete Architecture Documentation](architecture_diagram.png)
-
----
-
-## What to Say in Your Report About Scaling This Up
-
-Explicitly call out the production path — evaluators like seeing that you understand the tradeoffs you made:
-
-- Replace the CronJob with a real streaming pipeline (Kafka + Spark/Flink) to handle continuous high-volume clusters
-- Replace the Isolation Forest baseline with an LSTM/Autoencoder once you have enough historical data
-- Add a supervised failure classifier (XGBoost) once real failure events have been logged over time
-- Automate retraining with Airflow instead of manual reruns
-- Close the loop with a custom Kubernetes Operator that can act on recommendations automatically (behind manual approval for safety)
-
----
-
-## Prometheus Alerting + Alertmanager Integration
-
-KubeGuard AI supports native Kubernetes alerting via Prometheus Operator CRDs. Alerting rules are packaged as a `PrometheusRule` resource in the `kubeguard` namespace.
-
-### Alerts Configurations
-
-| Alert Name | Expression | Duration | Severity | Description |
-|---|---|---|---|---|
-| **KubeGuardHighRiskPod** | `kubeguard_pod_risk_score >= 60` | `2m` | `critical` | Fires when a pod has a risk score indicating immediate action is required |
-| **KubeGuardPodAnomaly** | `kubeguard_pod_anomaly == 1` | `2m` | `critical` | Fires when Isolation Forest detects statistical resource anomalies |
-| **KubeGuardMemoryGrowth** | `kubeguard_pod_memory_trend_bytes_per_second > 1000` | `2m` | `critical` | Fires when memory leak is detected (sustained memory trend > 1000 B/s) |
-| **KubeGuardCPUTrend** | `kubeguard_pod_cpu_trend > 0.0001` | `2m` | `critical` | Fires when CPU rate exhibits a positive trend slope > 0.0001 cores/s |
-| **KubeGuardPodRestart** | `kubeguard_pod_restart_count >= 4` | `2m` | `critical` | Fires when a pod reaches critical restart counts (restarts >= 4) |
-
-### Discovery & Routing Flow
-1. **Rule Discovery**: The Prometheus Operator dynamically discovers the KubeGuard rules via label matching: `release: kube-prometheus-stack`.
-2. **Reload**: Rules are synced into Prometheus configuration files and evaluated.
-3. **Alert Routing**: Firing alerts are sent to Alertmanager. *Note: External notifications (Slack, email, Webhooks) are not configured at this stage.*
-
-### Verification Steps
-1. **Healthy State**: Deploy normal workloads (e.g. `demo-nginx`). Confirm that no alerts are pending/firing.
-2. **Controlled Firing**: Deploy a load generation pod (`cpu-stress` or `memory-growth` in `kubeguard-test` namespace). Verify that KubeGuard detects the trend, raises the metric value, and Prometheus transitions the alert to `PENDING` and then `FIRING`.
-3. **Automatic Resolution**: Delete the stress workload. KubeGuard stale metric cleanup purges the defunct series. Prometheus rules evaluate to empty and automatically resolve the alerts.
-
+- [docs/INCIDENT_CORRELATION.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/INCIDENT_CORRELATION.md) — Event correlation, timeline events, and Alertmanager integration.
+- [docs/OBSERVABILITY.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/OBSERVABILITY.md) — Self-observability metrics, configuration, structured logging, and worker health.
+- [docs/MODEL_LIFECYCLE.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/MODEL_LIFECYCLE.md) — Feature store, baseline training, versioning, and persistence.
+- [cli/README.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/cli/README.md) — Command-line interface usage and options.
+- [kubernetes/manifests/README.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/kubernetes/manifests/README.md) — Test workload definitions and PrometheusRule manifests.
