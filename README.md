@@ -55,24 +55,24 @@ KubeGuard Source Code
 
 ```mermaid
 flowchart TD
-    subgraph Kubernetes Cluster
-        K8s["☸️ Monitored Pods (demo/kubeguard-test)"]
-        ServiceMonitor["⚙️ ServiceMonitor Target"]
-        PromRule["🔔 PrometheusRule Alerting"]
+    subgraph "Kubernetes Cluster"
+        K8s["Monitored Pods (demo/kubeguard-test)"]
+        ServiceMonitor["ServiceMonitor Target"]
+        PromRule["PrometheusRule Alerting"]
     end
 
-    subgraph Monitoring Stack
-        Prometheus["📊 Prometheus Server"]
-        Alertmanager["🔔 Alertmanager"]
-        Grafana["📈 Grafana Dashboard"]
+    subgraph "Monitoring Stack"
+        Prometheus["Prometheus Server"]
+        Alertmanager["Alertmanager"]
+        Grafana["Grafana Dashboard"]
     end
 
-    subgraph KubeGuard Application Release (Helm)
-        Worker["⚙️ Background Monitoring Worker"]
-        SQLite["💾 Feature & Incident Store (/data/kubeguard.db)"]
-        ModelStore["💾 Persisted ML Model (/data/kubeguard-isolation-forest.joblib)"]
-        PredictAPI["🐍 FastAPI Prediction Server"]
-        CLI["🛠️ KubeGuard CLI (kubeguard)"]
+    subgraph "KubeGuard Application Release (Helm)"
+        Worker["Background Monitoring Worker"]
+        SQLite["Feature & Incident Store (/data/kubeguard.db)"]
+        ModelStore["Persisted ML Model (/data/kubeguard-isolation-forest.joblib)"]
+        PredictAPI["FastAPI Prediction Server"]
+        CLI["KubeGuard CLI (kubeguard)"]
     end
 
     K8s -->|CPU/Memory/Restarts| Prometheus
@@ -84,9 +84,10 @@ flowchart TD
     Worker -->|Evaluates Risk & Incidents| SQLite
     Prometheus -->|Routes Firing Alerts| Alertmanager
     Worker -->|Correlates Firing Alerts| Alertmanager
-    Grafana -->|Queries Self & Workload Metrics| Prometheus
+    Grafana -->|Queries Metrics| Prometheus
     CLI -->|Queries API / Metrics / Helm| PredictAPI
 ```
+
 
 ---
 
