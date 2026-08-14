@@ -614,8 +614,69 @@
         { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_monitoring_cycle_duration_seconds_sum[5m]) / rate(kubeguard_monitoring_cycle_duration_seconds_count[5m])", "legendFormat": "Avg Duration (s)", "refId": "A" },
         { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_pod_predictions_total{result=\"failure\"}[5m])", "legendFormat": "Prediction Failures", "refId": "B" }
       ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "id": 30,
+      "title": "KubeGuard Incidents",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 34 },
+      "id": 31,
+      "title": "Active Incidents",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(kubeguard_active_incidents)", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 34 },
+      "id": 32,
+      "title": "Active HIGH-Risk Incidents",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "kubeguard_active_incidents{risk_level=\"HIGH\"}", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 34 },
+      "id": 33,
+      "title": "Total Incidents Created",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "kubeguard_incidents_created_total", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 34 },
+      "id": 34,
+      "title": "Total Incidents Resolved",
+      "type": "stat",
+      "targets": [{ "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "kubeguard_incidents_resolved_total", "refId": "A" }]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 39 },
+      "id": 35,
+      "title": "Incident Creation & Resolution Rate",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_incidents_created_total[5m])", "legendFormat": "Creation Rate", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_incidents_resolved_total[5m])", "legendFormat": "Resolution Rate", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 39 },
+      "id": 36,
+      "title": "Average Incident Duration (s)",
+      "type": "timeseries",
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "rate(kubeguard_incident_duration_seconds_sum[5m]) / rate(kubeguard_incident_duration_seconds_count[5m])", "legendFormat": "Avg Duration (s)", "refId": "A" }
+      ]
     }
   ],
+
 
   "schemaVersion": 38,
   "style": "dark",

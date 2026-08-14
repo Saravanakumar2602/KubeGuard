@@ -206,6 +206,7 @@ Everything else from the full enterprise version (Kafka, Spark/Flink, Elasticsea
 | 8 | Command-Line Interface (`kubeguard`) management layer | **Completed** |
 | 9 | Historical Feature Store (SQLite) & Model Lifecycle (`joblib`) | **Completed** |
 | 10 | Configuration & Observability Hardening (Self-Metrics, JSON Logs, Alerts) | **Completed** |
+| 11 | Event Correlation & Incident Context (Signals, Timeline, Alertmanager) | **Completed** |
 
 ---
 
@@ -235,6 +236,21 @@ KubeGuard monitors Kubernetes workloads AND exposes operational telemetry descri
 For full self-observability details, see [docs/OBSERVABILITY.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/OBSERVABILITY.md).
 
 ---
+
+## Event Correlation & Incident Context
+
+KubeGuard correlates anomaly signals, risk assessments, and Alertmanager events into persistent, operator-facing incident contexts:
+
+- **Signal Correlation**: Aggregates resource trend metrics, restart counts, and Isolation Forest ML anomaly classifications into active signals.
+- **Timeline Generation**: Records chronological state transitions (`incident_created`, `risk_escalated`, `ml_anomaly_detected`, `alert_fired`, `incident_resolved`).
+- **Alertmanager Integration**: Correlates firing and resolved Prometheus alerts directly with active pod incidents.
+- **Resolution Grace Period**: Configurable grace window (`INCIDENT_RESOLUTION_GRACE_SECONDS=120`) prevents flapping on temporary scrape drops.
+- **CLI & REST API Visibility**: Query incidents via `GET /incidents` or inspect detailed timelines using `kubeguard incidents --id <incident-id>`.
+
+For full incident correlation architecture, see [docs/INCIDENT_CORRELATION.md](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/docs/INCIDENT_CORRELATION.md).
+
+---
+
 
 
 

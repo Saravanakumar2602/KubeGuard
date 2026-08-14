@@ -139,6 +139,26 @@ kubeguard_config_info = Gauge(
     ["monitor_interval_seconds", "retention_days", "min_training_samples", "retrain_interval_seconds"]
 )
 
+# Incident Correlation Metrics (Step 18)
+kubeguard_incidents_created_total = Counter(
+    "kubeguard_incidents_created_total",
+    "Total KubeGuard incidents created"
+)
+kubeguard_incidents_resolved_total = Counter(
+    "kubeguard_incidents_resolved_total",
+    "Total KubeGuard incidents resolved"
+)
+kubeguard_active_incidents = Gauge(
+    "kubeguard_active_incidents",
+    "Current active KubeGuard incidents count by risk level",
+    ["risk_level"]
+)
+kubeguard_incident_duration_seconds = Histogram(
+    "kubeguard_incident_duration_seconds",
+    "Duration of resolved incidents in seconds"
+)
+
+
 
 def set_model_info_metric(source: str, version: int) -> None:
     """Clear stale model_info metrics and record active model state."""

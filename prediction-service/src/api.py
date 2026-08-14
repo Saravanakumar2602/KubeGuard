@@ -37,12 +37,13 @@ from metrics import (
 )
 from feature_store import FeatureStore
 from model_store import ModelStore
+from incident_store import IncidentStore
+from incident_manager import IncidentManager
 
 # Global config & logging setup
 config = KubeGuardConfig.from_env()
 setup_logging(log_level=config.log_level, log_format=config.log_format)
 logger = logging.getLogger("kubeguard-api")
-
 
 
 # -------------------------------------------------------------
@@ -86,7 +87,6 @@ class PredictionOrchestrator:
         self.config = cfg or KubeGuardConfig.from_env()
         logger.info(f"Initializing PrometheusClient with URL: {self.config.prometheus_url}")
 
-
         self.client = PrometheusClient(base_url=self.config.prometheus_url)
         self.collector = Collector(self.client)
         self.feature_service = FeatureService(self.client)
@@ -96,12 +96,18 @@ class PredictionOrchestrator:
         # Persistent storage & model stores
         self.feature_store = FeatureStore(db_path=self.config.feature_store_path)
         self.model_store = ModelStore(model_path=self.config.model_path)
+        self.incident_store = IncidentStore(db_path=self.config.feature_store_path)
+        self.incident_manager = IncidentManager(
+            incident_store=self.incident_store,
+            alertmanager_url=self.config.alertmanager_url,
+            resolution_grace_seconds=self.config.incident_resolution_grace_seconds,
+            retention_days=self.config.incident_retention_days,
+        )
 
         # Training threshold & retraining configs
         self.min_training_samples = self.config.min_training_samples
         self.model_retrain_interval_seconds = self.config.model_retrain_interval_seconds
         self.last_retrain_time = 0.0
-
 
     def initialize_model(self) -> bool:
         """Initialize Isolation Forest detector from disk artifact, real history, or bootstrap fallback."""
@@ -299,6 +305,12 @@ class PredictionOrchestrator:
             # 7. Update Prometheus metrics
             update_pod_metrics(pod_features, anomaly_res, risk_res)
 
+            # 8. Process Incident Correlation
+            try:
+                self.incident_manager.process_assessment(pod_features, anomaly_res, risk_res)
+            except Exception as inc_err:
+                logger.error(f"Error executing incident correlation for '{pod}': {inc_err}")
+
             duration = time.time() - start_time_pred
             kubeguard_prediction_duration_seconds.labels(namespace=namespace).observe(duration)
             kubeguard_pod_predictions_total.labels(namespace=namespace, result="success").inc()
@@ -315,7 +327,7 @@ class PredictionOrchestrator:
 app = FastAPI(
     title="KubeGuard AI Prediction Service",
     description="REST API to serve real-time anomaly detection and operational risk scores for Kubernetes pods.",
-    version="0.1.4"
+    version="0.1.5"
 )
 
 # Instantiate orchestrator and background worker
@@ -367,6 +379,31 @@ def ready(response: Response):
         return {"status": "ready"}
     response.status_code = 530
     return {"status": "not ready"}
+
+
+@app.get("/incidents", summary="Query active and resolved incidents")
+def get_incidents(
+    namespace: str | None = None,
+    status: str | None = None,
+    limit: int = 50,
+):
+    """Query recent incidents with optional filtering by namespace, status, and limit."""
+    incidents = orchestrator.incident_store.get_incidents(
+        namespace=namespace,
+        status=status,
+        limit=min(max(limit, 1), 200),
+    )
+    return [inc.to_dict() for inc in incidents]
+
+
+@app.get("/incidents/{incident_id:path}", summary="Get detailed incident context")
+def get_incident_detail(incident_id: str):
+    """Retrieve detailed incident context by incident_id including signals, timeline events, and alerts."""
+    inc = orchestrator.incident_store.get_incident(incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail=f"Incident '{incident_id}' not found.")
+    return inc.to_dict()
+
 
 
 

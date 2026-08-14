@@ -17,10 +17,8 @@ spec:
     spec:
       containers:
       - name: prediction-service
-        image: kubeguard-prediction-service:0.1.4
+        image: kubeguard-prediction-service:0.1.5
         imagePullPolicy: IfNotPresent
-
-
 
         ports:
         - containerPort: 8000
@@ -66,6 +64,37 @@ spec:
             configMapKeyRef:
               name: kubeguard-config
               key: MODEL_RETRAIN_INTERVAL_SECONDS
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: LOG_LEVEL
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: LOG_FORMAT
+        - name: WORKER_HEALTH_TIMEOUT_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: WORKER_HEALTH_TIMEOUT_SECONDS
+        - name: ALERTMANAGER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: ALERTMANAGER_URL
+        - name: INCIDENT_RESOLUTION_GRACE_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: INCIDENT_RESOLUTION_GRACE_SECONDS
+        - name: INCIDENT_RETENTION_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: kubeguard-config
+              key: INCIDENT_RETENTION_DAYS
+
         volumeMounts:
         - name: data-volume
           mountPath: /data

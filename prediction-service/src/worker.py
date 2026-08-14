@@ -129,11 +129,16 @@ class MonitoringWorker:
                                 extra={"namespace": ns, "pod": pod_name, "error_type": type(pod_err).__name__},
                             )
 
-                    # 4. Clean up stale pod metrics
+                    # 4. Clean up stale pod metrics and correlate Alertmanager alerts
                     try:
                         cleanup_stale_metrics(active_pods)
                     except Exception as clean_err:
                         logger.error(f"Error executing stale metrics cleanup: {clean_err}")
+
+                    try:
+                        self.orchestrator.incident_manager.correlate_alerts()
+                    except Exception as alert_err:
+                        logger.error(f"Error executing Alertmanager alert correlation: {alert_err}")
 
                     # Mark successful cycle timestamp
                     self.last_success_timestamp = time.time()
@@ -161,8 +166,12 @@ class MonitoringWorker:
                         last_retention_check = now
                         try:
                             self.orchestrator.feature_store.delete_old_features(self.retention_days)
+                            self.orchestrator.incident_store.delete_old_resolved_incidents(
+                                self.config.incident_retention_days
+                            )
                         except Exception as ret_err:
-                            logger.error(f"Error purging old features: {ret_err}")
+                            logger.error(f"Error purging old features/incidents: {ret_err}")
+
 
                 else:
                     logger.warning("Anomaly detector is not fitted yet. Skipping scan iteration.")

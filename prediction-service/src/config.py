@@ -34,6 +34,13 @@ class KubeGuardConfig:
     log_level: str = "INFO"
     log_format: str = "text"
     worker_health_timeout_seconds: float = 90.0
+    alertmanager_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "ALERTMANAGER_URL", "http://kube-prometheus-stack-alertmanager.monitoring.svc:9093"
+        )
+    )
+    incident_resolution_grace_seconds: float = 120.0
+    incident_retention_days: int = 30
 
     @classmethod
     def from_env(cls) -> KubeGuardConfig:
@@ -107,6 +114,28 @@ class KubeGuardConfig:
                 f"Invalid WORKER_HEALTH_TIMEOUT_SECONDS value '{raw_timeout}'. Must be a positive number."
             )
 
+        # 9. Incident resolution grace seconds
+        raw_grace = os.environ.get("INCIDENT_RESOLUTION_GRACE_SECONDS", "120")
+        try:
+            grace_seconds = float(raw_grace)
+            if grace_seconds < 0:
+                raise ValueError
+        except ValueError:
+            raise ValueError(
+                f"Invalid INCIDENT_RESOLUTION_GRACE_SECONDS value '{raw_grace}'. Must be a non-negative number."
+            )
+
+        # 10. Incident retention days
+        raw_inc_retention = os.environ.get("INCIDENT_RETENTION_DAYS", "30")
+        try:
+            inc_retention = int(raw_inc_retention)
+            if inc_retention < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError(
+                f"Invalid INCIDENT_RETENTION_DAYS value '{raw_inc_retention}'. Must be an integer >= 1."
+            )
+
         return cls(
             prometheus_url=os.environ.get("PROMETHEUS_URL", "http://localhost:9090"),
             monitor_namespaces=namespaces,
@@ -119,12 +148,18 @@ class KubeGuardConfig:
             log_level=log_level,
             log_format=log_format,
             worker_health_timeout_seconds=health_timeout,
+            alertmanager_url=os.environ.get(
+                "ALERTMANAGER_URL", "http://kube-prometheus-stack-alertmanager.monitoring.svc:9093"
+            ),
+            incident_resolution_grace_seconds=grace_seconds,
+            incident_retention_days=inc_retention,
         )
 
     def log_summary(self, target_logger: logging.Logger = logger) -> None:
         """Log a safe, non-sensitive summary of application configuration."""
         target_logger.info("KubeGuard Configuration Summary:")
         target_logger.info(f"  Prometheus URL           : {self.prometheus_url}")
+        target_logger.info(f"  Alertmanager URL         : {self.alertmanager_url}")
         target_logger.info(f"  Monitoring Interval      : {self.monitor_interval_seconds}s")
         target_logger.info(f"  Monitoring Namespaces    : {','.join(self.monitor_namespaces)}")
         target_logger.info(f"  Feature Store Path       : {self.feature_store_path}")
@@ -132,5 +167,8 @@ class KubeGuardConfig:
         target_logger.info(f"  Model Path               : {self.model_path}")
         target_logger.info(f"  Minimum Training Samples : {self.min_training_samples}")
         target_logger.info(f"  Model Retrain Interval   : {self.model_retrain_interval_seconds}s")
+        target_logger.info(f"  Incident Grace Period    : {self.incident_resolution_grace_seconds}s")
+        target_logger.info(f"  Incident Retention       : {self.incident_retention_days} days")
         target_logger.info(f"  Log Level / Format       : {self.log_level} / {self.log_format}")
         target_logger.info(f"  Worker Health Timeout    : {self.worker_health_timeout_seconds}s")
+

@@ -15,5 +15,9 @@ data:
   LOG_LEVEL: "INFO"
   LOG_FORMAT: "text"
   WORKER_HEALTH_TIMEOUT_SECONDS: "90"
+  ALERTMANAGER_URL: "http://kube-prometheus-stack-alertmanager.monitoring.svc:9093"
+  INCIDENT_RESOLUTION_GRACE_SECONDS: "120"
+  INCIDENT_RETENTION_DAYS: "30"
+
 
 

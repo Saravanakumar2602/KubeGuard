@@ -78,6 +78,22 @@ spec:
             configMapKeyRef:
               name: {{ include "kubeguard.fullname" . }}-config
               key: WORKER_HEALTH_TIMEOUT_SECONDS
+        - name: ALERTMANAGER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: ALERTMANAGER_URL
+        - name: INCIDENT_RESOLUTION_GRACE_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: INCIDENT_RESOLUTION_GRACE_SECONDS
+        - name: INCIDENT_RETENTION_DAYS
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "kubeguard.fullname" . }}-config
+              key: INCIDENT_RETENTION_DAYS
+
         {{- if .Values.persistence.enabled }}
         volumeMounts:
         - name: data-volume
