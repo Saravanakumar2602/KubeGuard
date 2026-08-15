@@ -2,7 +2,7 @@ apiVersion: v2
 name: kubeguard
 description: A Helm chart to deploy KubeGuard AI observatory prediction pipeline and alerting rules.
 type: application
-version: 0.1.5
-appVersion: "0.1.5"
+version: 0.1.6
+appVersion: "0.1.6"
 
 

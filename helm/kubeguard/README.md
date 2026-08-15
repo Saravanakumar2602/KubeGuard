@@ -32,8 +32,13 @@ The following table lists the configurable parameters of the KubeGuard chart and
 | `createNamespace` | Create the namespace during helm templates | `false` |
 | `replicaCount` | Number of replicas for prediction service | `1` |
 | `image.repository` | Docker image repository | `kubeguard-prediction-service` |
-| `image.tag` | Docker image tag | `0.1.2` |
+| `image.tag` | Docker image tag | `0.1.6` |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `podSecurityContext.enabled` | Enable pod security context | `true` |
+| `podSecurityContext.runAsNonRoot` | Enforce non-root execution | `true` |
+| `podSecurityContext.runAsUser` | User ID for container process | `10001` |
+| `securityContext.enabled` | Enable container security context | `true` |
+| `securityContext.allowPrivilegeEscalation` | Allow privilege escalation | `false` |
 | `service.type` | Kubernetes service type | `ClusterIP` |
 | `service.port` | Service listening port | `8000` |
 | `resources.requests.cpu` | CPU resource requests | `100m` |
@@ -42,6 +47,8 @@ The following table lists the configurable parameters of the KubeGuard chart and
 | `resources.limits.memory` | Memory resource limits | `256Mi` |
 | `monitoring.intervalSeconds` | Monitoring scanning worker period in seconds | `30` |
 | `monitoring.namespaces` | Monitored Kubernetes namespaces comma-separated | `"demo,kubeguard-test"` |
+| `persistence.enabled` | Enable PersistentVolumeClaim storage | `true` |
+| `persistence.storageClassName` | StorageClass for PVC (empty uses default) | `""` |
 | `prometheus.url` | Internal endpoint URL of cluster Prometheus service | `"http://kube-prometheus-stack-prometheus.monitoring.svc:9090"` |
 | `serviceMonitor.enabled` | Enable ServiceMonitor generation for scrape discovery | `true` |
 | `serviceMonitor.interval` | Scrape period for metrics scraping | `15s` |
@@ -100,13 +107,14 @@ helm uninstall kubeguard --namespace kubeguard
 ## Local Development in Kind
 1. Rebuild and load docker image in local Kind nodes:
    ```bash
-   docker build -f prediction-service/Dockerfile -t kubeguard-prediction-service:0.1.2 .
-   kind load docker-image kubeguard-prediction-service:0.1.2 --name kubeguard
+   docker build -f prediction-service/Dockerfile -t kubeguard-prediction-service:0.1.6 .
+   kind load docker-image kubeguard-prediction-service:0.1.6 --name kubeguard
    ```
 2. Install via Helm using target tag:
    ```bash
    helm install kubeguard helm/kubeguard \
      --namespace kubeguard \
      --create-namespace \
-     --set image.tag="0.1.2"
+     --set image.tag="0.1.6"
    ```
+

@@ -71,6 +71,22 @@ class PortForwardContext:
         """Return the local base URL for the forwarded port."""
         return f"http://127.0.0.1:{self._local_port}"
 
+    def _cleanup_process(self) -> None:
+        """Terminate and kill the port-forward process if running."""
+        if self._proc:
+            try:
+                if self._proc.poll() is None:
+                    self._proc.terminate()
+                    try:
+                        self._proc.wait(timeout=2.0)
+                    except subprocess.TimeoutExpired:
+                        self._proc.kill()
+                        self._proc.wait(timeout=1.0)
+            except Exception:
+                pass
+            finally:
+                self._proc = None
+
     def __enter__(self) -> str:
         cmd = ["kubectl"]
         if self._context:
@@ -81,27 +97,25 @@ class PortForwardContext:
             f"{self._local_port}:{self._remote_port}",
             "-n", self._namespace,
         ]
-        self._proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-
-        if not _wait_for_port(self._local_port, self._timeout):
-            self._proc.terminate()
-            self._proc = None
-            raise RuntimeError(
-                f"Port-forward to {self._target}:{self._remote_port} "
-                f"did not become ready within {self._timeout}s."
+        try:
+            self._proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
 
-        return self.url
+            if not _wait_for_port(self._local_port, self._timeout):
+                self._cleanup_process()
+                raise RuntimeError(
+                    f"Port-forward to {self._target}:{self._remote_port} "
+                    f"did not become ready within {self._timeout}s."
+                )
+
+            return self.url
+        except Exception:
+            self._cleanup_process()
+            raise
 
     def __exit__(self, *args) -> None:
-        if self._proc and self._proc.poll() is None:
-            self._proc.terminate()
-            try:
-                self._proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self._proc.kill()
-        self._proc = None
+        self._cleanup_process()
+

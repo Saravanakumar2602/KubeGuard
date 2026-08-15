@@ -1,7 +1,7 @@
 # KubeGuard AI — Kubernetes Workload Health & Risk Observatory
 
-[![Application Version](https://img.shields.io/badge/KubeGuard%20App-v0.1.5-blue.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/Chart.yaml)
-[![Helm Chart](https://img.shields.io/badge/Helm%20Chart-v0.1.5-green.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/Chart.yaml)
+[![Application Version](https://img.shields.io/badge/KubeGuard%20App-v0.1.6-blue.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/Chart.yaml)
+[![Helm Chart](https://img.shields.io/badge/Helm%20Chart-v0.1.6-green.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/helm/kubeguard/Chart.yaml)
 [![CLI Version](https://img.shields.io/badge/CLI-v0.1.0-orange.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/cli/README.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg)](file:///c:/Saravanakumar%20G/Projects/Kubernets-cloud%20kyro/KubeGuard/LICENSE)
 
@@ -9,7 +9,7 @@
 
 ## What is KubeGuard?
 
-**KubeGuard AI** is an AI-assisted Kubernetes workload health and risk monitoring application. It continuously monitors Kubernetes workloads, detects resource anomalies and degradation trends, calculates operational risk scores, and correlates alerts into actionable incident contexts.
+**KubeGuard AI** is an AI-assisted Kubernetes workload health and risk monitoring application (Kubernetes-native MVP / production-oriented prototype). It continuously monitors Kubernetes workloads, detects resource anomalies and degradation trends, calculates operational risk scores, and correlates alerts into actionable incident contexts.
 
 KubeGuard:
 - **Collects Telemetry**: Scrapes Kubernetes workload metrics via Prometheus (`kubelet` + `kube-state-metrics`).
@@ -18,8 +18,9 @@ KubeGuard:
 - **Rule Engine**: Combines ML anomaly signals with deterministic operational rules to produce a 0–100 risk score and `LOW`, `MEDIUM`, or `HIGH` risk levels.
 - **Continuous Background Monitoring**: Periodically evaluates configured target namespaces.
 - **Event & Incident Correlation**: Correlates ML signals, metric trends, and Prometheus Alertmanager alerts into persistent incident records with chronological timeline state events.
-- **Persistent Storage**: Stores historical feature observations, versioned ML models (`joblib`), and incident history using persistent storage (`PersistentVolumeClaim` / SQLite).
+- **Persistent Storage & WAL Mode**: Stores historical feature observations, atomic versioned ML models (`joblib`), and incident history using persistent storage (`PersistentVolumeClaim` / SQLite in WAL mode).
 - **Self-Observability**: Exposes internal operational telemetry (`kubeguard_*` metrics) for Prometheus/Grafana and tracks background worker health.
+- **Security Hardened**: Container runs as dedicated non-root user (`UID 10001`) with dropped capabilities (`drop: [ALL]`).
 - **Operator CLI**: Includes a command-line interface (`kubeguard`) for installation, status checking, pod risk inspection, and incident tracking.
 
 > [!IMPORTANT]
@@ -37,7 +38,7 @@ Developer / Build Side                                   User Cluster Deployment
 KubeGuard Source Code
         │
         ├──► Docker Container Image ──► Container Registry ──┐
-        │    (kubeguard-prediction-service:0.1.5)           │
+        │    (kubeguard-prediction-service:0.1.6)           │
         │                                                    ▼
         └──► Helm Chart Packaging   ──► Helm Repository ──► Helm Release (Deployment / PVC)
              (helm/kubeguard)                                │
@@ -46,7 +47,7 @@ KubeGuard Source Code
                                                     (kubeguard)
 ```
 
-- **Developer Workflow**: Source code is containerized into a lightweight Docker image (`kubeguard-prediction-service:0.1.5`) and packaged into a versioned Helm chart (`helm/kubeguard`).
+- **Developer Workflow**: Source code is containerized into a lightweight Docker image (`kubeguard-prediction-service:0.1.6`) and packaged into a versioned Helm chart (`helm/kubeguard`).
 - **User Installation**: Site Reliability Engineers (SREs) and cluster operators deploy KubeGuard into any Kubernetes cluster using `helm install` or the `kubeguard` CLI — without needing Python runtime setups or building container images.
 
 ---

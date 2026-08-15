@@ -1,18 +1,44 @@
-# API Documentation
+# KubeGuard AI — REST API Documentation
 
-The FastAPI application exposes prediction services, metrics scraping targets, and system check endpoints.
+The KubeGuard FastAPI application serves prediction endpoints, incident management contexts, model metadata, exporter metrics, and health probes.
 
 ---
 
-## 1. Get Pod Predictions
+## 1. System Health & Readiness
 
-Retrieves real-time features processing, anomaly classification, and scaling advice for a specific Kubernetes Pod.
+### Service Health
+- **Endpoint**: `GET /health`
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "healthy",
+    "worker_running": true,
+    "baseline_trained": true,
+    "last_successful_monitoring": 1786689500.0,
+    "worker_status": "healthy"
+  }
+  ```
+
+### Readiness Probe
+- **Endpoint**: `GET /ready`
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "status": "ready",
+    "worker_running": true,
+    "last_successful_monitoring": 1786689500.0
+  }
+  ```
+
+---
+
+## 2. Pod Prediction Service
 
 - **Endpoint**: `GET /predict/{namespace}/{pod}`
 - **Path Parameters**:
   - `namespace` (string, required): Pod target namespace (e.g. `demo`).
-  - `pod` (string, required): Target pod identifier.
-- **Example Response (`200 OK`)**:
+  - `pod` (string, required): Target pod name.
+- **Response (`200 OK`)**:
   ```json
   {
     "pod": "demo-nginx-7cb864b4f9-jvjh8",
@@ -24,40 +50,86 @@ Retrieves real-time features processing, anomaly classification, and scaling adv
     "recommendation": "All systems nominal for pod demo-nginx-7cb864b4f9-jvjh8. No action required."
   }
   ```
-- **Error Response (`400 Bad Request`)**:
+
+---
+
+## 3. Incident Correlation Endpoints
+
+### List Incidents
+- **Endpoint**: `GET /incidents?namespace=demo&status=active&limit=50`
+- **Query Parameters**:
+  - `namespace` (string, optional): Filter by namespace.
+  - `status` (string, optional): Filter by `active` or `resolved`.
+  - `limit` (integer, optional): Maximum records to return (default: 50).
+- **Response (`200 OK`)**:
   ```json
-  {
-    "detail": "Incomplete observation for pod demo-nginx-7cb864b4f9-jvjh8. Feature index 0 is None. All features must be fully populated."
-  }
+  [
+    {
+      "incident_id": "demo/pod-1/1786689500",
+      "namespace": "demo",
+      "pod": "pod-1",
+      "status": "active",
+      "risk_level": "HIGH",
+      "risk_score": 85,
+      "created_at": "2026-08-15T09:00:00Z",
+      "updated_at": "2026-08-15T09:05:00Z"
+    }
+  ]
   ```
 
----
-
-## 2. Prometheus Exporter Metrics
-
-Provides the current cluster state in standard text formatting for scraping by Prometheus.
-
-- **Endpoint**: `GET /metrics`
-- **Output Mappings**:
-  - `kubeguard_pod_risk_score`: Current risk score registry Gauge.
-  - `kubeguard_pod_anomaly`: Current outlier status Gauge (1 = Anomaly, 0 = Normal).
-  - `kubeguard_pod_risk_level`: Multi-label Gauge mapping risk grades (LOW, MEDIUM, HIGH).
-  - `kubeguard_pod_cpu_trend`: Evaluated CPU slope value (cores/second).
-  - `kubeguard_pod_memory_trend_bytes_per_second`: Evaluated Memory slope value (bytes/second).
-  - `kubeguard_pod_restart_count`: Active restart count.
-
----
-
-## 3. System Healthcheck
-
-FastAPI health verification endpoints.
-
-- **Endpoint**: `GET /health`
+### Get Incident Detail
+- **Endpoint**: `GET /incidents/{incident_id:path}`
 - **Response (`200 OK`)**:
   ```json
   {
-    "status": "healthy",
-    "worker_running": true,
-    "baseline_trained": true
+    "incident_id": "demo/pod-1/1786689500",
+    "namespace": "demo",
+    "pod": "pod-1",
+    "status": "active",
+    "risk_level": "HIGH",
+    "risk_score": 85,
+    "created_at": "2026-08-15T09:00:00Z",
+    "updated_at": "2026-08-15T09:05:00Z",
+    "signals": [
+      {
+        "signal_name": "memory_growth",
+        "severity": "HIGH",
+        "value": "5000 B/s",
+        "description": "Memory growth detected.",
+        "detected_at": "2026-08-15T09:00:00Z"
+      }
+    ],
+    "timeline": [
+      {
+        "timestamp": "2026-08-15T09:00:00Z",
+        "event_type": "incident_created",
+        "description": "Incident created for pod 'pod-1' in namespace 'demo'",
+        "severity": "high"
+      }
+    ],
+    "alerts": [],
+    "recommendation": "Investigate memory growth."
   }
   ```
+
+---
+
+## 4. Model Metadata Endpoint
+
+- **Endpoint**: `GET /model`
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "model_version": 1,
+    "model_source": "historical",
+    "training_sample_count": 50,
+    "trained_at": "2026-08-15T09:00:00Z"
+  }
+  ```
+
+---
+
+## 5. Exporter Prometheus Metrics
+
+- **Endpoint**: `GET /metrics`
+- **Response**: Standard Prometheus exposition format containing `kubeguard_*` self-observability and workload risk gauges.

@@ -15,8 +15,22 @@ spec:
       labels:
         {{- include "kubeguard.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if and .Values.podSecurityContext .Values.podSecurityContext.enabled }}
+      securityContext:
+        runAsNonRoot: {{ .Values.podSecurityContext.runAsNonRoot }}
+        runAsUser: {{ .Values.podSecurityContext.runAsUser }}
+        runAsGroup: {{ .Values.podSecurityContext.runAsGroup }}
+        fsGroup: {{ .Values.podSecurityContext.fsGroup }}
+      {{- end }}
       containers:
       - name: prediction-service
+        {{- if and .Values.securityContext .Values.securityContext.enabled }}
+        securityContext:
+          allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
+          capabilities:
+            drop:
+            {{- toYaml .Values.securityContext.capabilities.drop | nindent 14 }}
+        {{- end }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:

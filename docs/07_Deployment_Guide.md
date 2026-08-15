@@ -18,8 +18,8 @@ Before installing the chart, ensure you have:
 3. Prometheus Operator installed (e.g. via `kube-prometheus-stack` Helm chart).
 4. KubeGuard Docker image built and loaded onto your Kind node:
    ```bash
-   docker build -f prediction-service/Dockerfile -t kubeguard-prediction-service:0.1.2 .
-   kind load docker-image kubeguard-prediction-service:0.1.2 --name kubeguard
+   docker build -f prediction-service/Dockerfile -t kubeguard-prediction-service:0.1.6 .
+   kind load docker-image kubeguard-prediction-service:0.1.6 --name kubeguard
    ```
 
 ---

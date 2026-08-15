@@ -1,7 +1,7 @@
 """KubeGuard CLI package."""
 
 CLI_VERSION = "0.1.0"
-CHART_APP_VERSION = "0.1.5"
+CHART_APP_VERSION = "0.1.6"
 
 
 DEFAULT_NAMESPACE = "kubeguard"
