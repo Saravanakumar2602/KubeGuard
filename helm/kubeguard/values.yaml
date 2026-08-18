@@ -9,8 +9,22 @@ replicaCount: 1
 
 image:
   repository: kubeguard-prediction-service
-  tag: "0.1.5"
+  tag: "0.1.6"
   pullPolicy: IfNotPresent
+
+podSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+securityContext:
+  enabled: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
 
 logging:
   level: "INFO"
@@ -45,6 +59,7 @@ monitoring:
 persistence:
   enabled: true
   size: 1Gi
+  storageClassName: ""
   accessMode: ReadWriteOnce
   featureStorePath: "/data/kubeguard.db"
   retentionDays: 7

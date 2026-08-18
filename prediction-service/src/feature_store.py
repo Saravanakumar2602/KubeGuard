@@ -55,6 +55,15 @@ class FeatureStore:
 
         conn = sqlite3.connect(self.db_path, timeout=10.0)
         conn.row_factory = sqlite3.Row
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Could not set PRAGMA journal_mode=WAL: {e}")
+        try:
+            conn.execute("PRAGMA busy_timeout=5000;")
+            conn.execute("PRAGMA foreign_keys=ON;")
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Could not set SQLite PRAGMAs: {e}")
         return conn
 
     @contextmanager

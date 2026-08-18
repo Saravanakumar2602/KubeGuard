@@ -11,12 +11,26 @@ from rich.table import Table
 from rich import box
 from rich.text import Text
 
-# Use ASCII fallbacks on Windows legacy terminals that don't support Unicode
-import sys as _sys
-_IS_WIN = _sys.platform == "win32"
-_OK  = "[OK]"  if _IS_WIN else "✓"
-_DOT = "·"
-_WARN = "!"     if _IS_WIN else "⚠"
+def _supports_unicode() -> bool:
+    """Return True if stdout can safely render Unicode characters without encoding errors."""
+    try:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        "✓".encode(encoding)
+        return True
+    except (UnicodeEncodeError, AttributeError, TypeError):
+        return False
+
+
+_UNICODE_SUPPORTED = _supports_unicode()
+_OK = "✓" if _UNICODE_SUPPORTED else "[OK]"
+_DOT = "·" if _UNICODE_SUPPORTED else "*"
+_WARN = "⚠" if _UNICODE_SUPPORTED else "!"
+
+
+def get_symbol(unicode_sym: str, ascii_sym: str) -> str:
+    """Return unicode_sym if stdout supports Unicode, else ascii_sym."""
+    return unicode_sym if _UNICODE_SUPPORTED else ascii_sym
+
 
 console = Console()
 err_console = Console(stderr=True, style="bold red")

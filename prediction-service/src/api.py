@@ -5,6 +5,7 @@ import logging
 import threading
 from typing import List, Dict
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Path, Response
 from pydantic import BaseModel, Field
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
@@ -324,12 +325,6 @@ class PredictionOrchestrator:
 # -------------------------------------------------------------
 # FastAPI Application setup
 # -------------------------------------------------------------
-app = FastAPI(
-    title="KubeGuard AI Prediction Service",
-    description="REST API to serve real-time anomaly detection and operational risk scores for Kubernetes pods.",
-    version="0.1.5"
-)
-
 # Instantiate orchestrator and background worker
 from worker import MonitoringWorker
 
@@ -337,20 +332,28 @@ orchestrator = PredictionOrchestrator(config)
 worker = MonitoringWorker(orchestrator, config)
 
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # Log configuration summary
     config.log_summary(logger)
     # Attempt to train baseline model on startup
     orchestrator.initialize_model()
     # Start background monitoring worker
     worker.start()
+    try:
+        yield
+    finally:
+        # Stop background monitoring worker cleanly on shutdown
+        worker.stop()
 
 
-@app.on_event("shutdown")
-def shutdown_event():
-    # Stop background monitoring worker
-    worker.stop()
+app = FastAPI(
+    title="KubeGuard AI Prediction Service",
+    description="REST API to serve real-time anomaly detection and operational risk scores for Kubernetes pods.",
+    version="0.1.6",
+    lifespan=lifespan,
+)
+
 
 
 # -------------------------------------------------------------

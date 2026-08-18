@@ -75,3 +75,15 @@ class TestModelStore:
 
         meta2 = temp_model_store.save_model(clf, training_sample_count=20)
         assert meta2["model_version"] == 2
+
+    def test_atomic_save_and_temp_file_cleanup(self, temp_model_store):
+        clf = _fit_dummy_model()
+        temp_path = temp_model_store.model_path + ".tmp"
+        assert not os.path.exists(temp_path)
+
+        meta = temp_model_store.save_model(clf, training_sample_count=15)
+        assert meta["model_version"] == 1
+        assert os.path.exists(temp_model_store.model_path)
+        # Temp file must be removed after successful atomic replace
+        assert not os.path.exists(temp_path)
+

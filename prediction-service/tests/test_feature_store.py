@@ -58,6 +58,16 @@ def _make_pod_features(pod="nginx-1", ns="demo", cpu=0.05, mem=50.0):
 class TestFeatureStore:
     def test_database_initialization(self, temp_store):
         assert os.path.exists(temp_store.db_path)
+
+    def test_sqlite_pragmas_wal_and_busy_timeout(self, temp_store):
+        with temp_store._connect() as conn:
+            journal_mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+            busy_timeout = conn.execute("PRAGMA busy_timeout;").fetchone()[0]
+            foreign_keys = conn.execute("PRAGMA foreign_keys;").fetchone()[0]
+
+            assert journal_mode.lower() == "wal"
+            assert busy_timeout == 5000
+            assert foreign_keys == 1
         assert temp_store.count_features() == 0
 
     def test_save_and_count_feature(self, temp_store):

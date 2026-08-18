@@ -9,7 +9,7 @@ import requests
 import typer
 
 from kubeguard_cli.utils import helm
-from kubeguard_cli.utils.output import console, print_error, print_json, print_table, styled_risk
+from kubeguard_cli.utils.output import console, print_error, print_json, print_table, styled_risk, get_symbol
 from kubeguard_cli.utils.portforward import PortForwardContext
 
 
@@ -179,7 +179,8 @@ def _render_incident_detail(inc: dict, as_json: bool = False) -> None:
         for s in signals:
             sev = s.get("severity", "LOW")
             sev_styled = styled_risk(sev)
-            console.print(f"    [bold green]✓[/bold green] [bold]{s.get('signal_name')}[/bold] ({sev_styled}) — {s.get('description')}")
+            tick = get_symbol("✓", "[OK]")
+            console.print(f"    [bold green]{tick}[/bold green] [bold]{s.get('signal_name')}[/bold] ({sev_styled}) — {s.get('description')}")
 
     # Timeline
     console.print("\n  [bold white]Timeline:[/bold white]")

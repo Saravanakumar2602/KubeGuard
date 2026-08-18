@@ -106,11 +106,23 @@ class ModelStore:
             }
 
             # Atomic save via joblib
-            joblib.dump(payload, self.model_path)
-            logger.info(
-                f"Saved model (version {version}, source={model_source}, samples={training_sample_count}) to {self.model_path}"
-            )
-            return metadata
+            temp_path = self.model_path + ".tmp"
+            try:
+                joblib.dump(payload, temp_path)
+                os.replace(temp_path, self.model_path)
+                logger.info(
+                    f"Saved model (version {version}, source={model_source}, samples={training_sample_count}) to {self.model_path}"
+                )
+                return metadata
+            except Exception as e:
+                logger.error(f"Failed to write model artifact to {temp_path}: {e}")
+                if os.path.exists(temp_path):
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
+                raise
+
 
     def load_model(self) -> Tuple[Optional[IsolationForest], Optional[Dict[str, Any]]]:
         """Load serialized model and metadata from disk.
